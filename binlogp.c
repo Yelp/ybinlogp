@@ -1,3 +1,5 @@
+#define _XOPEN_SOURCE 600
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -9,8 +11,6 @@
 #include <string.h>
 #include <time.h>
 
-#define MIN_TIMESTAMP 1262325600	/* 2010-01-01 00:00:00 */
-time_t MAX_TIMESTAMP;
 #define MAX_RETRIES	409600			/* how many bytes to seek ahead looking for a record */
 
 #define GET_BIT(x,bit) (!!(x & 1 << bit))
@@ -22,6 +22,9 @@ time_t MAX_TIMESTAMP;
 #define MAX_TYPE_CODE 27
 #define MIN_EVENT_LENGTH 91
 #define MAX_EVENT_LENGTH 1073741824
+#define MAX_SERVER_ID 2147483648
+#define MIN_TIMESTAMP 1262325600	/* 2010-01-01 00:00:00 */
+time_t MAX_TIMESTAMP;				/* Set this time(NULL) on startup */
 
 
 char* event_types[27] = {
@@ -133,7 +136,8 @@ inline int check_event(struct event *e)
 			e->event_length > MIN_EVENT_LENGTH &&
 			e->event_length < MAX_EVENT_LENGTH && 
 			e->timestamp > MIN_TIMESTAMP &&
-			e->timestamp < MAX_TIMESTAMP) {
+			e->timestamp < MAX_TIMESTAMP &&
+			e->server_id < MAX_SERVER_ID) {
 		return 1;
 	} else {
 		return 0;
@@ -148,43 +152,33 @@ char* read_extra_data(int fd, off_t seek_pos, size_t amount)
 	fprintf(stderr, "Reading %zd bytes from %llu\n", amount, (long long)seek_pos);
 #endif
 	data = malloc(amount);
-	lseek(fd, SEEK_SET, seek_pos);
-	read(fd, data, amount);
+	if (pread(fd, data, amount, seek_pos) < 0) {
+		perror("read in read_extra_data:");
+	}
 	return data;
 }
 
-int main(int argc, char **argv)
+int nearest_offset(int fd, off_t starting_offset, struct stat *stbuf)
 {
-	int fd;
 	unsigned int num_increments = 0;
 	off_t offset;
-	off_t seeked;
 	ssize_t amt_read;
-	struct stat stbuf;
 	struct event evbuf;
-	if (argc != 3) {
-		usage();
-		return 1;
-	}
-	if (stat(argv[1], &stbuf)) {
-		perror("Error stat-ing file");
-		return 1;
-	}
-	MAX_TIMESTAMP = time(NULL);
-	offset = atoll(argv[2]);
-	fd = open(argv[1], O_RDONLY);
+	offset = starting_offset;
+#if DEBUG
+	fprintf(stderr, "In nearest offset mode, got fd=%d, starting_offset=%llu\n", fd, (long long)starting_offset);
+#endif
 	while (num_increments < MAX_RETRIES) 
 	{
-		if (stbuf.st_size < offset) {
-			fprintf(stderr, "%s is only %lld bytes, requested %lld\n", argv[1], (long long)stbuf.st_size, (long long)offset);
+		if (stbuf->st_size < offset) {
+			fprintf(stderr, "file is only %lld bytes, requested %lld\n", (long long)stbuf->st_size, (long long)offset);
 			return 1;
 		}
 #ifdef DEBUG
 		fprintf(stderr, "Seeking to %lld\n", (long long)offset);
 #endif
-		seeked = lseek(fd, offset, SEEK_SET);
-		if (seeked != offset) {
-			fprintf(stderr, "Error seeking to offset %lld\n", (long long) offset);
+		if ((lseek(fd, offset, SEEK_SET) < 0)) {
+			perror("Error seeking");
 			return 1;
 		}
 		amt_read = read(fd, (void*)&evbuf, HEADER_SIZE);
@@ -217,6 +211,57 @@ int main(int argc, char **argv)
 			free(evbuf.data);
 		}
 	}
-	close(fd);
 	return 0;
+}
+
+int main(int argc, char **argv)
+{
+	int fd, exit_status;
+	struct stat stbuf;
+	int opt;
+	
+	int t_mode = 0;
+	int o_mode = 0;
+
+	MAX_TIMESTAMP = time(NULL);
+
+	/* Parse args */
+	while ((opt = getopt(argc, argv, "to")) != -1) {
+		switch (opt) {
+			case 't':		/* Time mode */
+				t_mode = 1;
+				break;
+			case 'o':		/* Offset mode */
+				o_mode = 1;
+				break;
+			default:
+				usage();
+				return 1;
+		}
+	}
+	if (optind >= argc) {
+		usage();
+		return 1;
+	}
+	/* First argument is always filename */
+	if (stat(argv[optind], &stbuf)) {
+		perror("Error stat-ing file");
+		return 1;
+	}
+#if DEBUG
+	fprintf(stderr, "Opening file %s\n", argv[optind]);
+#endif
+	if ((fd = open(argv[optind], O_RDONLY)) <= 0) {
+		perror("Error opening file");
+		return 1;
+	}
+	exit_status = 0;
+	if (t_mode) {
+	}
+	else if (o_mode) {
+		off_t starting_offset = atoll(argv[optind+1]);
+		exit_status = nearest_offset(fd, starting_offset, &stbuf);
+	}
+	close(fd);
+	return exit_status;
 }
