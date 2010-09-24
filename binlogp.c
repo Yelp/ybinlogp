@@ -1,3 +1,9 @@
+/*
+ * binlogp: A mysql binary log parser and query tool
+ *
+ * (C) 2010 Yelp, Inc.
+ */
+
 #define _XOPEN_SOURCE 600
 
 #include <stdio.h>
@@ -119,9 +125,11 @@ void print_event(struct event *e) {
 			struct query_event *q = (struct query_event*)e->data;
 			char* status_vars = (e->data + sizeof(struct query_event));
 			char* db_name = (status_vars + q->status_var_len);
+			size_t statement_len = e->length - EVENT_HEADER_SIZE - sizeof(struct query_event) - q->status_var_len - q->db_name_len - 1;
 			char* statement = (db_name + q->db_name_len + 1);
+			statement[statement_len] = '\0';		/* Binlog doesn't NUL-terminate the query */
 			printf("thread id:          %d\n", q->thread_id);
-			printf("query time (s):     %f\n", q->query_time);
+			printf("query time (s):     %d\n", q->query_time);
 			if (q->error_code == 0) {
 				printf("error code:         %d\n", q->error_code);
 			}

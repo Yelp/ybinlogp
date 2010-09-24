@@ -19,7 +19,7 @@ struct event {
 
 struct format_description_event {
 	uint16_t	format_version;	/* ought to be 4 */
-	char[50]	server_version;
+	char		server_version[50];
 	uint32_t	timestamp;
 	uint8_t		header_length;
 };
