@@ -60,6 +60,19 @@ char* event_types[27] = {
 	"HEARTBEAT_LOG_EVENT"			// 26
 };
 
+char* variable_types[10] = {
+	"Q_FLAGS2_CODE",			// 0
+	"Q_SQL_MODE_CODE",			// 1
+	"Q_CATALOG_CODE",			// 2
+	"Q_AUTO_INCREMENT",			// 3
+	"Q_CHARSET_CODE",			// 4
+	"Q_TIME_ZONE_CODE",			// 5
+	"Q_CATALOG_NZ_CODE",			// 6
+	"Q_LC_TIME_NAMES_CODE",			// 7
+	"Q_CHARSET_DATABASE_CODE",		// 8
+	"Q_TABLE_MAP_FOR_UPDATE_CODE",		// 9
+};
+
 /*
  * Attempt to find the first event after a particular position in a mysql
  * binlog and, if you find it, print it out.
@@ -80,7 +93,7 @@ void print_event(struct event *e) {
 	printf("server id:          %d\n", e->server_id);
 	printf("length:             %d\n", e->length);
 	printf("next pos:           %llu\n", (unsigned long long)e->next_position);
-	printf("flags:              %d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d\n",
+	printf("flags:              %hhd%hhd%hhd%hhd%hhd%hhd%hhd%hhd%hhd%hhd%hhd%hhd%hhd%hhd%hhd%hhd\n",
 			GET_BIT(e->flags, 0),
 			GET_BIT(e->flags, 1),
 			GET_BIT(e->flags, 2),
@@ -107,10 +120,14 @@ void print_event(struct event *e) {
 			char* status_vars = (e->data + sizeof(struct query_event));
 			char* db_name = (status_vars + q->status_var_len);
 			char* statement = (db_name + q->db_name_len + 1);
-			size_t statement_len = e->length - EVENT_HEADER_SIZE - sizeof(struct query_event) - q->status_var_len - q->db_name_len - 1;
 			printf("thread id:          %d\n", q->thread_id);
-			printf("query time (s):     %d\n", q->query_time);
-			printf("error code:         %d\n", q->error_code);
+			printf("query time (s):     %f\n", q->query_time);
+			if (q->error_code == 0) {
+				printf("error code:         %d\n", q->error_code);
+			}
+			else {
+				printf("ERROR CODE:         %d\n", q->error_code);
+			}
 			printf("db_name:            %s\n", db_name);
 			printf("statement:          %s\n", statement);
 			}
@@ -131,9 +148,15 @@ void print_event(struct event *e) {
 
 void usage()
 {
-	fprintf(stderr, "Usage: binlogp logfile offset-start\n");
+	fprintf(stderr, "Usage: binlogp [mode] logfile [mode-args]\n");
 	fprintf(stderr, "\n");
-	fprintf(stderr, "Prints the first plausible event after offset-start\n");
+	fprintf(stderr, "binlogp supports several different modes:\n");
+	fprintf(stderr, "\t-o Find the first event after the given offset\n");
+	fprintf(stderr, "\t\tbinlogp -o offset logfile\n");
+	fprintf(stderr, "\t-t Find the event closest to the given unix time\n");
+	fprintf(stderr, "\t\tbinlogp -t timestamp logfile\n");
+	fprintf(stderr, "\t-a When used with one of the above, print N items after the first one\n");
+	fprintf(stderr, "\t\tbinlogp -a N -t timestamp logfile\n");
 }
 
 int check_event(struct event *e)
@@ -308,26 +331,34 @@ int main(int argc, char **argv)
 {
 	int fd, exit_status;
 	struct stat stbuf;
+	struct event evbuf;
 	int opt;
 	off_t offset;
+	int shown;
 	
+	time_t target_time;
+	off_t starting_offset;
+	int num_to_show = 1;
 	int t_mode = 0;
 	int o_mode = 0;
-	int a_mode = 0;
 
 	MAX_TIMESTAMP = time(NULL);
 
 	/* Parse args */
-	while ((opt = getopt(argc, argv, "toa")) != -1) {
+	while ((opt = getopt(argc, argv, "t:o:a:")) != -1) {
 		switch (opt) {
 			case 't':		/* Time mode */
+				target_time = atol(optarg);
 				t_mode = 1;
 				break;
 			case 'o':		/* Offset mode */
+				starting_offset = atoll(optarg);
 				o_mode = 1;
 				break;
 			case 'a':
-				a_mode = 1;
+				num_to_show = atoi(optarg);
+				if (num_to_show < 1)
+					num_to_show = 1;
 				break;
 			default:
 				usage();
@@ -353,43 +384,23 @@ int main(int argc, char **argv)
 	read_fde(fd);
 	exit_status = 0;
 	if (t_mode) {
-		time_t target_time = atol(argv[optind+1]);
-		struct event evbuf;
 		offset = nearest_time(fd, target_time, &stbuf, &evbuf);
-		if (offset == -2) {
-			fprintf(stderr, "Could not find any records\n");
-		}
-		if (offset < 0) {
-			exit_status = 1;
-		}
-		else {
-			print_event(&evbuf);
-		}
 	}
 	else if (o_mode) {
-		off_t starting_offset;
-		struct event evbuf;
-		if (optind+1 >= argc) {
-			usage();
-			return 1;
-		}
-		starting_offset = atoll(argv[optind+1]);
 		offset = nearest_offset(fd, starting_offset, &stbuf, &evbuf, 1);
-		if (offset == -2) {
-			fprintf(stderr, "Could not find any records\n");
-		}
-		if (offset < 0) {
-			exit_status = 1;
-		}
-		else {
-			print_event(&evbuf);
-		}
 	}
-	if (a_mode) {
-		int num_records_to_show = atoi(argv[optind+2]);
-		int shown = 0;
-		struct event evbuf;
-		while ((shown < num_records_to_show) && (offset > 0)) {
+
+	if (offset == -2) {
+		fprintf(stderr, "Could not find any records\n");
+		exit_status = 2;
+	}
+	if (offset < 0) {
+		exit_status = 1;
+	}
+	else {
+		print_event(&evbuf);
+		while ((shown < num_to_show) && (offset > 0)) {
+			try_free_data(&evbuf);
 			offset = nearest_offset(fd, offset+1, &stbuf, &evbuf, 1);
 			if (offset > 0) {
 				printf("\n");
@@ -398,6 +409,7 @@ int main(int argc, char **argv)
 			++shown;
 		}
 	}
+
 	close(fd);
 	return exit_status;
 }
