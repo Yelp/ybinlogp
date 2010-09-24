@@ -4,6 +4,11 @@
  * (C) 2010 Yelp, Inc.
  */
 
+#define BINLOG_VERSION 4
+
+
+#define EVENT_HEADER_SIZE 19	/* we tack on extra stuff at the end */
+
 #pragma pack(push)
 #pragma pack(1)			/* force byte alignment */
 struct event {
@@ -17,29 +22,55 @@ struct event {
 	off_t		offset;
 };
 
+#define format_description_event_data(e) (e->data + ((struct format_description_event*)e->data)->header_length)
+#define format_description_event_data_len(e) (((struct format_description_event*)e->data)->header_len - EVENT_HEADER_SIZE)
 struct format_description_event {
 	uint16_t	format_version;	/* ought to be 4 */
 	char		server_version[50];
 	uint32_t	timestamp;
-	uint8_t		header_length;
+	uint8_t		header_len;
+	// random data
 };
 
+#define query_event_statement(e) (e->data + sizeof(struct query_event) + ((struct query_event*)e->data)->status_var_len + ((struct query_event*)e->data)->db_name_len + 1)
+#define query_event_statement_len(e) (e->length - EVENT_HEADER_SIZE - sizeof(struct query_event) - ((struct query_event*)e->data)->status_var_len - ((struct query_event*)e->data)->db_name_len - 1)
+#define query_event_db_name(e) (e->data + sizeof(struct query_event) + ((struct query_event*)e->data)->status_var_len)
 struct query_event {
 	uint32_t	thread_id;
 	uint32_t	query_time;
 	uint8_t		db_name_len;
 	uint16_t	error_code;
 	uint16_t	status_var_len;
+	// status variables (status_var_len)
+	// database name    (db_name_len + 1, NUL)
+	// statement        (the rest, not NUL)
 };
 
 struct rand_event {
 	uint64_t	seed_1;
 	uint64_t	seed_2;
 };
+
+struct xid_event {
+	uint64_t	id;
+};
+
+struct intvar_event {
+	uint8_t		type;
+	uint64_t	value;
+};
+
+#define rotate_event_file_name(e) (e->data + 8)
+#define rotate_event_file_name_len(e) (e->length - EVENT_HEADER_SIZE -8)
+struct rotate_event {
+	uint64_t	next_position;
+	// file name of the next file (not NUL)
+};
 #pragma pack(pop)
 
 void print_event(struct event *e);
 int check_event(struct event *e);
-int read_data(int fd, struct event *evbuf, off_t offset);
-int try_free_data(struct event *evbuf);
-long long nearest_offset(int fd, off_t starting_offset, struct stat *stbuf, struct event *evbuf, int dir);
+
+int read_event(int fd, struct event *evbuf, off_t offset);
+int copy_event(struct event *dest, struct event *source);
+void dipose_event(struct event *evbuf);
