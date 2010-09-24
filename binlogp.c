@@ -13,11 +13,11 @@
 
 #include "binlogp.h"
 
-#define MAX_RETRIES	409600			/* how many bytes to seek ahead looking for a record */
+#define MAX_RETRIES	102400  /* how many bytes to seek ahead looking for a record */
 
 #define GET_BIT(x,bit) (!!(x & 1 << bit))
 
-#define HEADER_SIZE 19
+#define EVENT_HEADER_SIZE 19
 
 /* binlog parameters */
 #define MIN_TYPE_CODE 0
@@ -25,38 +25,39 @@
 #define MIN_EVENT_LENGTH 91
 #define MAX_EVENT_LENGTH 1073741824
 #define MAX_SERVER_ID 2147483648
-#define MIN_TIMESTAMP 1262325600	/* 2010-01-01 00:00:00 */
+/* #define MIN_TIMESTAMP 1262325600	* 2010-01-01 00:00:00 */
+time_t MIN_TIMESTAMP;				/* set to the time in the FDE */
 time_t MAX_TIMESTAMP;				/* Set this time(NULL) on startup */
 
 
 char* event_types[27] = {
-	"UNKNOWN_EVENT",
-	"START_EVENT_V3",
-	"QUERY_EVENT",
-	"STOP_EVENT",
-	"ROTATE_EVENT",
-	"INTVAR_EVENT",
-	"LOAD_EVENT",
-	"SLAVE_EVENT",
-	"CREATE_FILE_EVENT",
-	"APPEND_BLOCK_EVENT",
-	"EXEC_LOAD_EVENT",
-	"DELETE_FILE_EVENT",
-	"NEW_LOAD_EVENT",
-	"RAND_EVENT",
-	"USER_VAR_EVENT",
-	"FORMAT_DESCRIPTION_EVENT",
-	"XID_EVENT",
-	"BEGIN_LOAD_QUERY_EVENT",
-	"EXECUTE_LOAD_QUERY_EVENT",
-	"TABLE_MAP_EVENT",
-	"PRE_GA_WRITE_ROWS_EVENT",
-	"PRE_GA_DELETE_ROWS_EVENT",
-	"WRITE_ROWS_EVENT",
-	"UPDATE_ROWS_EVENT",
-	"DELETE_ROWS_EVENT",
-	"INCIDENT_EVENT",
-	"HEARTBEAT_LOG_EVENT"
+	"UNKNOWN_EVENT",			// 0
+	"START_EVENT_V3",			// 1
+	"QUERY_EVENT",				// 2
+	"STOP_EVENT",				// 3
+	"ROTATE_EVENT",				// 4
+	"INTVAR_EVENT",				// 5
+	"LOAD_EVENT",				// 6
+	"SLAVE_EVENT",				// 7
+	"CREATE_FILE_EVENT",			// 8
+	"APPEND_BLOCK_EVENT",			// 9
+	"EXEC_LOAD_EVENT",			// 10
+	"DELETE_FILE_EVENT",			// 11
+	"NEW_LOAD_EVENT",			// 12
+	"RAND_EVENT",				// 13
+	"USER_VAR_EVENT",			// 14
+	"FORMAT_DESCRIPTION_EVENT",		// 15
+	"XID_EVENT",				// 16
+	"BEGIN_LOAD_QUERY_EVENT",		// 17
+	"EXECUTE_LOAD_QUERY_EVENT",		// 18
+	"TABLE_MAP_EVENT",			// 19
+	"PRE_GA_WRITE_ROWS_EVENT",		// 20
+	"PRE_GA_DELETE_ROWS_EVENT",		// 21
+	"WRITE_ROWS_EVENT",			// 22
+	"UPDATE_ROWS_EVENT",			// 23
+	"DELETE_ROWS_EVENT",			// 24
+	"INCIDENT_EVENT",			// 25
+	"HEARTBEAT_LOG_EVENT"			// 26
 };
 
 /*
@@ -77,7 +78,7 @@ void print_event(struct event *e) {
 	printf("timestamp:          %s (%d)\n", datebuf, e->timestamp);
 	printf("type_code:          %s\n", event_types[e->type_code]);
 	printf("server id:          %d\n", e->server_id);
-	printf("length:             %d\n", e->event_length);
+	printf("length:             %d\n", e->length);
 	printf("next pos:           %llu\n", (unsigned long long)e->next_position);
 	printf("flags:              %d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d\n",
 			GET_BIT(e->flags, 0),
@@ -96,11 +97,29 @@ void print_event(struct event *e) {
 			GET_BIT(e->flags, 13),
 			GET_BIT(e->flags, 14),
 			GET_BIT(e->flags, 15));
+	if (e->data == NULL) {
+		return;
+	}
 	switch (e->type_code) {
 		case 2:				/* QUERY_EVENT */
 			{
-			printf("thread id:          %d\n", ((uint32_t*)e->data)[0]);
-			printf("query time (s):     %d\n", ((uint32_t*)e->data)[1]);
+			struct query_event *q = (struct query_event*)e->data;
+			char* status_vars = (e->data + sizeof(struct query_event));
+			char* db_name = (status_vars + q->status_var_len);
+			char* statement = (db_name + q->db_name_len + 1);
+			size_t statement_len = e->length - EVENT_HEADER_SIZE - sizeof(struct query_event) - q->status_var_len - q->db_name_len - 1;
+			printf("thread id:          %d\n", q->thread_id);
+			printf("query time (s):     %d\n", q->query_time);
+			printf("error code:         %d\n", q->error_code);
+			printf("db_name:            %s\n", db_name);
+			printf("statement:          %s\n", statement);
+			}
+			break;
+		case 13:
+			{
+			struct rand_event *r = (struct rand_event*)e->data;
+			printf("seed 1:	            %llu\n", (unsigned long long) r->seed_1);
+			printf("seed 2:	            %llu\n", (unsigned long long) r->seed_2);
 			}
 			break;
 		case 15:			/* FORMAT_DESCRIPTION_EVENT */
@@ -119,13 +138,13 @@ void usage()
 
 int check_event(struct event *e)
 {
-	if (e->type_code > MIN_TYPE_CODE &&
+	if (e->server_id < MAX_SERVER_ID &&
+			e->type_code > MIN_TYPE_CODE &&
 			e->type_code < MAX_TYPE_CODE &&
-			e->event_length > MIN_EVENT_LENGTH &&
-			e->event_length < MAX_EVENT_LENGTH && 
-			e->timestamp > MIN_TIMESTAMP &&
-			e->timestamp < MAX_TIMESTAMP &&
-			e->server_id < MAX_SERVER_ID) {
+			e->length > MIN_EVENT_LENGTH &&
+			e->length < MAX_EVENT_LENGTH && 
+			e->timestamp >= MIN_TIMESTAMP &&
+			e->timestamp <= MAX_TIMESTAMP) {
 		return 1;
 	} else {
 		return 0;
@@ -139,46 +158,46 @@ int read_data(int fd, struct event *evbuf, off_t offset)
 		perror("Error seeking");
 		return -1;
 	}
-	amt_read = read(fd, (void*)evbuf, HEADER_SIZE);
+	amt_read = read(fd, (void*)evbuf, EVENT_HEADER_SIZE);
 	evbuf->offset = offset;
 	evbuf->data = 0;
 	if (amt_read < 0) {
 		fprintf(stderr, "Error reading event at %lld: %s\n", (long long) offset, strerror(errno));
 		return -1;
-	} else if ((size_t)amt_read != HEADER_SIZE) {
+	} else if ((size_t)amt_read != EVENT_HEADER_SIZE) {
 		fprintf(stderr, "Only able to read %zd bytes, good bye\n", amt_read);
 		return -1;
-	}
-	/* Maybe read some extra data */
-	switch (evbuf->type_code) {
-		case 2:
-			evbuf->data = read_extra_data(fd, offset + HEADER_SIZE, 8);
-			break;
-		case 15:
-			evbuf->data = read_extra_data(fd, offset + HEADER_SIZE, 52);
-			break;
 	}
 	return 0;
 }
 
-char* read_extra_data(int fd, off_t seek_pos, size_t amount)
+/**
+ * Maybe read in some dynamic data
+ **/
+int read_extra_data(int fd, struct event *evbuf)
 {
-	char* data;
-	data = malloc(amount);
-#if DEBUG
-	fprintf(stderr, "Reading %zd bytes from %llu\n", amount, (long long)seek_pos);
-#endif
-	data = malloc(amount);
-	if (pread(fd, data, amount, seek_pos) < 0) {
-		perror("read in read_extra_data:");
+	if (evbuf->data != 0) {
+		free(evbuf->data);
+		evbuf->data = 0;
 	}
-	return data;
+#if DEBUG
+	fprintf(stderr, "mallocing %d bytes\n", evbuf->length - EVENT_HEADER_SIZE);
+#endif
+	if ((evbuf->data = malloc(evbuf->length - EVENT_HEADER_SIZE)) == NULL) {
+		perror("malloc:");
+		return -1;
+	}
+	if (pread(fd, evbuf->data, evbuf->length - EVENT_HEADER_SIZE, evbuf->offset + EVENT_HEADER_SIZE) < 0) {
+		perror("reading extra data:");
+		return -1;
+	}
+	return 0;
 }
 
 /*
  * If necessary, free any dynamic data in evbuf
  */
-int free_data(struct event *evbuf)
+int try_free_data(struct event *evbuf)
 {
 	if (evbuf->data != 0) {
 		free(evbuf->data);
@@ -191,7 +210,7 @@ int free_data(struct event *evbuf)
  *
  * If evbuf is non-null, copy it into there
  */
-long long nearest_offset(int fd, off_t starting_offset, struct stat *stbuf, struct event *outbuf)
+long long nearest_offset(int fd, off_t starting_offset, struct stat *stbuf, struct event *outbuf, int direction)
 {
 	unsigned int num_increments = 0;
 	off_t offset;
@@ -200,27 +219,33 @@ long long nearest_offset(int fd, off_t starting_offset, struct stat *stbuf, stru
 #if DEBUG
 	fprintf(stderr, "In nearest offset mode, got fd=%d, starting_offset=%llu\n", fd, (long long)starting_offset);
 #endif
-	while (num_increments < MAX_RETRIES) 
+	while (num_increments < MAX_RETRIES && offset >= 0) 
 	{
 		if (stbuf->st_size < offset) {
 			fprintf(stderr, "file is only %lld bytes, requested %lld\n", (long long)stbuf->st_size, (long long)offset);
 			return -1;
 		}
-#ifdef DEBUG
+#if DEBUG
 		//fprintf(stderr, "Seeking to %lld\n", (long long)offset);
 #endif
-		read_data(fd, &evbuf, offset);
+		if (read_data(fd, &evbuf, offset) < 0) {
+			return -1;
+		}
 		if (check_event(&evbuf)) {
+			read_extra_data(fd, &evbuf);
 			if (outbuf != NULL) {
 				*outbuf = evbuf;
 			}
 			return offset;
 		} else {
-			++offset;
+			offset += direction;
 			++num_increments;
 		}
-		free_data(&evbuf);
+		try_free_data(&evbuf);
 	}
+#if DEBUG
+	fprintf(stderr, "Unable to find anything (offset=%llu)\n",(long long) offset);
+#endif
 	return -2;
 }
 
@@ -230,11 +255,10 @@ int nearest_time(int fd, time_t target, struct stat *stbuf, struct event *outbuf
 	struct event evbuf;
 	off_t offset = file_size / 2;
 	off_t next_increment = file_size / 4;
-	int directionality = 0;
+	int directionality = 1;
 	off_t found;
 	while (next_increment > 2) {
-		int old_directionality = directionality;
-		found = nearest_offset(fd, offset, stbuf, &evbuf);
+		found = nearest_offset(fd, offset, stbuf, &evbuf, directionality);
 		long long delta;
 		if (found < 0) {
 			return found;
@@ -248,16 +272,35 @@ int nearest_time(int fd, time_t target, struct stat *stbuf, struct event *outbuf
 		}
 		/* Success when we switch directions */
 #if DEBUG
-		fprintf(stderr, "delta=%d, directionality=%d, old_directionality=%d\n", delta, directionality, old_directionality);
+		fprintf(stderr, "delta=%lld at %llu, directionality=%d, next_increment=%lld\n", (long long)delta, (unsigned long long)found, directionality, (long long)next_increment);
 #endif
 		if (delta == 0) {
 			break;
 		}
-		offset += next_increment * directionality;
+	  	if (directionality == -1) {
+			offset += (next_increment  * directionality);
+		}
+		else {
+			offset += (next_increment * directionality);
+		}
 		next_increment /= 2;
 	}
 	*outbuf = evbuf;
 	return found;
+}
+
+/**
+ * Read the FDE and set the server-id
+ **/
+int read_fde(int fd)
+{
+	struct event evbuf;
+	read_data(fd, &evbuf, 4);
+#if DEBUG
+	fprintf(stderr, "Got server-id of %d\n", evbuf.server_id);
+#endif
+	MIN_TIMESTAMP = evbuf.timestamp;
+	try_free_data(&evbuf);
 	return 0;
 }
 
@@ -266,20 +309,25 @@ int main(int argc, char **argv)
 	int fd, exit_status;
 	struct stat stbuf;
 	int opt;
+	off_t offset;
 	
 	int t_mode = 0;
 	int o_mode = 0;
+	int a_mode = 0;
 
 	MAX_TIMESTAMP = time(NULL);
 
 	/* Parse args */
-	while ((opt = getopt(argc, argv, "to")) != -1) {
+	while ((opt = getopt(argc, argv, "toa")) != -1) {
 		switch (opt) {
 			case 't':		/* Time mode */
 				t_mode = 1;
 				break;
 			case 'o':		/* Offset mode */
 				o_mode = 1;
+				break;
+			case 'a':
+				a_mode = 1;
 				break;
 			default:
 				usage();
@@ -302,11 +350,11 @@ int main(int argc, char **argv)
 		perror("Error opening file");
 		return 1;
 	}
+	read_fde(fd);
 	exit_status = 0;
 	if (t_mode) {
 		time_t target_time = atol(argv[optind+1]);
 		struct event evbuf;
-		off_t offset;
 		offset = nearest_time(fd, target_time, &stbuf, &evbuf);
 		if (offset == -2) {
 			fprintf(stderr, "Could not find any records\n");
@@ -319,10 +367,14 @@ int main(int argc, char **argv)
 		}
 	}
 	else if (o_mode) {
-		off_t starting_offset = atoll(argv[optind+1]);
-		long long offset;
+		off_t starting_offset;
 		struct event evbuf;
-		offset = nearest_offset(fd, starting_offset, &stbuf, &evbuf);
+		if (optind+1 >= argc) {
+			usage();
+			return 1;
+		}
+		starting_offset = atoll(argv[optind+1]);
+		offset = nearest_offset(fd, starting_offset, &stbuf, &evbuf, 1);
 		if (offset == -2) {
 			fprintf(stderr, "Could not find any records\n");
 		}
@@ -331,6 +383,19 @@ int main(int argc, char **argv)
 		}
 		else {
 			print_event(&evbuf);
+		}
+	}
+	if (a_mode) {
+		int num_records_to_show = atoi(argv[optind+2]);
+		int shown = 0;
+		struct event evbuf;
+		while ((shown < num_records_to_show) && (offset > 0)) {
+			offset = nearest_offset(fd, offset+1, &stbuf, &evbuf, 1);
+			if (offset > 0) {
+				printf("\n");
+				print_event(&evbuf);
+			}
+			++shown;
 		}
 	}
 	close(fd);
