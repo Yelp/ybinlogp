@@ -68,9 +68,46 @@ struct rotate_event {
 };
 #pragma pack(pop)
 
-void print_event(struct event *e);
-int check_event(struct event *e);
+/**
+ * Initialize an event object. Event objects must live on the heap
+ * and must be destroyed with dispose_event().
+ *
+ * Just sets everything to 0 for now.
+ **/
+void init_event(struct event*);
 
-int read_event(int fd, struct event *evbuf, off_t offset);
-int copy_event(struct event *dest, struct event *source);
-void dipose_event(struct event *evbuf);
+/**
+ * Reset an event object, making it re-fillable
+ *
+ * Deletes the extra data and re-inits the object
+ */
+void reset_event(struct event *);
+
+/**
+ * Copy an event object, including any extra data
+ */
+int copy_event(struct event *, struct event *);
+
+/**
+ * Destroy an event object and any associated data
+ **/
+void dipose_event(struct event *);
+
+/**
+ * Print out an event
+ **/
+void print_event(struct event *e);
+
+/**
+ * Read an event from the specified offset into the given event buffer.
+ *
+ * Will also malloc() space for any dynamic portions of the event, if the 
+ * event passes check_event.
+ **/
+int read_event(int, struct event *, off64_t);
+
+/**
+ * Check to see if an event looks valid.
+ **/
+int check_event(struct event *);
+

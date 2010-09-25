@@ -29,9 +29,8 @@
 #define MIN_TYPE_CODE 0
 #define MAX_TYPE_CODE 27
 #define MIN_EVENT_LENGTH 19
-#define MAX_EVENT_LENGTH 1073741824
-#define MAX_SERVER_ID 2147483648
-/* #define MIN_TIMESTAMP 1262325600	* 2010-01-01 00:00:00 */
+#define MAX_EVENT_LENGTH 10485760		/* Can't see why you'd have events >10MB. */
+#define MAX_SERVER_ID 2147483648		/* 0 <= server_id  <= 2**31 */
 time_t MIN_TIMESTAMP;				/* set to the time in the FDE */
 time_t MAX_TIMESTAMP;				/* Set this time(NULL) on startup */
 
@@ -103,19 +102,20 @@ struct stat stbuf;
 void print_event(struct event *e) {
 	int i;
 	const time_t t = e->timestamp;
-	printf("BYTE OFFSET:        %llu\n", (long long)e->offset);
+	printf("BYTE OFFSET %llu\n", (long long)e->offset);
+	printf("------------------------\n");
 	printf("timestamp:          %d = %s", e->timestamp, ctime(&t));
 	printf("type_code:          %s\n", event_types[e->type_code]);
 	printf("server id:          %d\n", e->server_id);
 	printf("length:             %d\n", e->length);
 	printf("next pos:           %llu\n", (unsigned long long)e->next_position);
 	printf("flags:              ");
-	for(i = 0; i < 16; ++i)
+	for(i=16; i > 0; --i)
 	{
 		printf("%hhd", GET_BIT(e->flags, i));
 	}
 	printf("\n");
-	for(i=0; i< 16; ++i)
+	for(i=16; i > 0; --i)
 	{
 		if (GET_BIT(e->flags, i))
 			printf("                        %s\n", flags[i-1]);
@@ -257,18 +257,6 @@ int read_event(int fd, struct event *evbuf, off64_t offset)
 	return 0;
 }
 
-/**
- * Maybe read in some dynamic data
- **/
-int read_extra_data(int fd, struct event *evbuf)
-{
-	if (pread(fd, evbuf->data, evbuf->length - EVENT_HEADER_SIZE, evbuf->offset + EVENT_HEADER_SIZE) < 0) {
-		perror("reading extra data:");
-		return -1;
-	}
-	return 0;
-}
-
 void init_event(struct event *evbuf)
 {
 	memset(evbuf, 0, sizeof(struct event));
@@ -295,6 +283,7 @@ void reset_event(struct event *evbuf)
 		free(evbuf->data);
 		evbuf->data = 0;
 	}
+	init_event(evbuf);
 }
 
 int copy_event(struct event *dest, struct event *source)
@@ -383,16 +372,17 @@ int nearest_time(int fd, time_t target, struct event *outbuf)
 	off64_t offset = file_size / 2;
 	off64_t next_increment = file_size / 4;
 	int directionality = 1;
-	off64_t found, last_found;
+	off64_t found, last_found = 0;
 	while (next_increment > 2) {
+		long long delta;
 		reset_event(evbuf);
 		found = nearest_offset(fd, offset, evbuf, directionality);
-		long long delta;
 		if (found == -1) {
 			return found;
 		}
 		else if (found == -2) {
 			fprintf(stderr, "Ran off the end of the file, probably going to have a bad match\n");
+			last_found = found;
 			break;
 		}
 		last_found = found;
@@ -449,11 +439,11 @@ int main(int argc, char **argv)
 	struct event *evbuf = malloc(sizeof(struct event));
 	init_event(evbuf);
 	int opt;
-	off64_t offset;
+	off64_t offset = 0;
 	int shown = 1;
 	
-	time_t target_time;
-	off64_t starting_offset;
+	time_t target_time = time(NULL);
+	off64_t starting_offset = 0;
 	int show_all = 0;
 	int num_to_show = 1;
 	int t_mode = 0;
