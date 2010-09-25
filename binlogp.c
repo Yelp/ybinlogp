@@ -79,7 +79,7 @@ char* variable_types[10] = {
 };
 
 char* intvar_types[3] = {
-	"PARSER_ERROR",				// 0
+	"",
 	"LAST_INSERT_ID_EVENT",			// 1
 	"INSERT_ID_EVENT",			// 2
 };
@@ -106,6 +106,8 @@ void print_event(struct event *e) {
 	printf("------------------------\n");
 	printf("timestamp:          %d = %s", e->timestamp, ctime(&t));
 	printf("type_code:          %s\n", event_types[e->type_code]);
+	if (q_mode > 1)
+		return;
 	printf("server id:          %d\n", e->server_id);
 	printf("length:             %d\n", e->length);
 	printf("next pos:           %llu\n", (unsigned long long)e->next_position);
@@ -147,7 +149,7 @@ void print_event(struct event *e) {
 			printf("status var length:  %d\n", q->status_var_len);
 			printf("db_name:            %s\n", db_name);
 			printf("statement length:   %zd\n", statement_len);
-			if (!q_mode)
+			if (q_mode > 0)
 				printf("statement:          %s\n", statement);
 			free(statement);
 			}
@@ -205,6 +207,7 @@ void usage()
 	fprintf(stderr, "\t\tAccepts either an integer or the text 'all'\n");
 	fprintf(stderr, "\t\tbinlogp -a N -t timestamp logfile\n");
 	fprintf(stderr, "\t-q Be slightly quieter when printing (don't print statement contents\n");
+	fprintf(stderr, "\t-Q Be much quieter (only print offset, timestamp, and type code)\n");
 }
 
 int check_event(struct event *e)
@@ -452,7 +455,7 @@ int main(int argc, char **argv)
 	MAX_TIMESTAMP = time(NULL);
 
 	/* Parse args */
-	while ((opt = getopt(argc, argv, "t:o:a:q")) != -1) {
+	while ((opt = getopt(argc, argv, "t:o:a:qQ")) != -1) {
 		switch (opt) {
 			case 't':		/* Time mode */
 				target_time = atol(optarg);
@@ -476,6 +479,9 @@ int main(int argc, char **argv)
 				break;
 			case 'q':
 				q_mode = 1;
+				break;
+			case 'Q':
+				q_mode = 2;
 				break;
 			case '?':
 				fprintf(stderr, "Unknown argument %c\n", optopt);
