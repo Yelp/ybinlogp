@@ -1,16 +1,16 @@
 SOURCES := $(wildcard *.c *.h)
-TARGETS := binlogp
+TARGETS := ybinlogp
 
 CFLAGS=-Wall -ggdb -Wextra -O2
 #CFLAGS=-Wall -ggdb -Wextra -DDEBUG
 
 all: $(TARGETS)
 
-binlogp: binlogp.o
+ybinlogp: ybinlogp.o
 
 force:: clean all
 
 clean::
 	rm -f $(TARGETS) *.o
 
-binlogp.o: binlogp.c binlogp.h
+ybinlogp.o: ybinlogp.c ybinlogp.h

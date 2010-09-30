@@ -1,5 +1,5 @@
 /*
- * binlogp: A mysql binary log parser and query tool
+ * ybinlogp: A mysql binary log parser and query tool
  *
  * (C) 2010 Yelp, Inc.
  */
@@ -19,7 +19,7 @@
 #include <time.h>
 #include <assert.h>
 
-#include "binlogp.h"
+#include "ybinlogp.h"
 
 #define MAX_RETRIES	102400  /* how many bytes to seek ahead looking for a record */
 
@@ -196,16 +196,16 @@ void print_event(struct event *e) {
 
 void usage()
 {
-	fprintf(stderr, "Usage: binlogp [mode] logfile [mode-args]\n");
+	fprintf(stderr, "Usage: ybinlogp [mode] logfile [mode-args]\n");
 	fprintf(stderr, "\n");
-	fprintf(stderr, "binlogp supports several different modes:\n");
+	fprintf(stderr, "ybinlogp supports several different modes:\n");
 	fprintf(stderr, "\t-o Find the first event after the given offset\n");
-	fprintf(stderr, "\t\tbinlogp -o offset logfile\n");
+	fprintf(stderr, "\t\tybinlogp -o offset logfile\n");
 	fprintf(stderr, "\t-t Find the event closest to the given unix time\n");
-	fprintf(stderr, "\t\tbinlogp -t timestamp logfile\n");
+	fprintf(stderr, "\t\tybinlogp -t timestamp logfile\n");
 	fprintf(stderr, "\t-a When used with one of the above, print N items after the first one\n");
 	fprintf(stderr, "\t\tAccepts either an integer or the text 'all'\n");
-	fprintf(stderr, "\t\tbinlogp -a N -t timestamp logfile\n");
+	fprintf(stderr, "\t\tybinlogp -a N -t timestamp logfile\n");
 	fprintf(stderr, "\t-q Be slightly quieter when printing (don't print statement contents\n");
 	fprintf(stderr, "\t-Q Be much quieter (only print offset, timestamp, and type code)\n");
 }
