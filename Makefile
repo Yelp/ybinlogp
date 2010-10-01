@@ -1,7 +1,7 @@
 SOURCES := $(wildcard *.c *.h)
 TARGETS := ybinlogp
 
-CFLAGS=-Wall -ggdb -Wextra -O2
+CFLAGS=-Wall -ggdb -Wextra
 #CFLAGS=-Wall -ggdb -Wextra -DDEBUG
 
 all: $(TARGETS)
