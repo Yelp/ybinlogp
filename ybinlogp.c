@@ -250,7 +250,7 @@ int read_event(int fd, struct event *evbuf, off64_t offset)
 			return -1;
 		}
 #if DEBUG
-		fprintf(stderr, "malloced %d bytes at 0x%x for a %s\n", evbuf->length - EVENT_HEADER_SIZE, evbuf->data, event_types[evbuf->type_code]);
+		fprintf(stderr, "malloced %d bytes at 0x%p for a %s\n", evbuf->length - EVENT_HEADER_SIZE, evbuf->data, event_types[evbuf->type_code]);
 #endif
 		if (read(fd, evbuf->data, evbuf->length - EVENT_HEADER_SIZE) < 0) {
 			perror("reading extra data:");
@@ -268,7 +268,7 @@ void init_event(struct event *evbuf)
 void dispose_event(struct event *evbuf)
 {
 #if DEBUG
-	fprintf(stderr, "About to dispose_event 0x%x\n", evbuf);
+	fprintf(stderr, "About to dispose_event 0x%p\n", evbuf);
 #endif
 	if (evbuf->data != 0) {
 		free(evbuf->data);
@@ -292,7 +292,7 @@ void reset_event(struct event *evbuf)
 int copy_event(struct event *dest, struct event *source)
 {
 #if DEBUG
-	fprintf(stderr, "About to copy 0x%x to 0x%x\n", source, dest);
+	fprintf(stderr, "About to copy 0x%p to 0x%p\n", source, dest);
 #endif
 	memmove(dest, source, sizeof(struct event));
 	if (source->data != 0) {
@@ -304,7 +304,7 @@ int copy_event(struct event *dest, struct event *source)
 			return -1;
 		}
 #if DEBUG
-		fprintf(stderr, "copying extra data from 0x%x to 0x%x\n", source->data, dest->data);
+		fprintf(stderr, "copying extra data from 0x%p to 0x%p\n", source->data, dest->data);
 #endif
 		memmove(dest->data, source->data, source->length - EVENT_HEADER_SIZE);
 	}
