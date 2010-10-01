@@ -96,7 +96,7 @@ int copy_event(struct event *, struct event *);
 /**
  * Destroy an event object and any associated data
  **/
-void dipose_event(struct event *);
+void dispose_event(struct event *);
 
 /**
  * Print out an event
