@@ -4,6 +4,10 @@
  * (C) 2010 Yelp, Inc.
  */
 
+#include <unistd.h>
+#include <sys/types.h>
+#include <stdint.h>
+
 #define BINLOG_VERSION 4
 
 
@@ -19,7 +23,7 @@ struct event {
 	uint32_t	next_position;
 	uint16_t	flags;
 	char*		data;
-	off_t		offset;
+	off64_t		offset;
 };
 
 #define format_description_event_data(e) (e->data + ((struct format_description_event*)e->data)->header_length)
