@@ -30,7 +30,7 @@
 #define MAX_TYPE_CODE 27
 #define MIN_EVENT_LENGTH 19
 #define MAX_EVENT_LENGTH 10485760		/* Can't see why you'd have events >10MB. */
-#define MAX_SERVER_ID 2147483648		/* 0 <= server_id  <= 2**31 */
+#define MAX_SERVER_ID 4294967295		/* 0 <= server_id  <= 2**31 */
 time_t MIN_TIMESTAMP;				/* set to the time in the FDE */
 time_t MAX_TIMESTAMP;				/* Set this time(NULL) on startup */
 
@@ -426,6 +426,9 @@ int read_fde(int fd)
 	if (read_event(fd, evbuf, 4) < 0) {
 		return -1;
 	}
+#if DEBUG
+	print_event(evbuf);
+#endif
 	struct format_description_event *f = (struct format_description_event*) evbuf->data;
 	if (f->format_version != BINLOG_VERSION) {
 		fprintf(stderr, "Invalid binlog! Expected version %d, got %d\n", BINLOG_VERSION, f->format_version);
