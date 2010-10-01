@@ -116,4 +116,16 @@ int read_event(int, struct event *, off64_t);
  **/
 int check_event(struct event *);
 
+/**
+ * Find the offset of the next event after the one passed in.
+ * Uses the built-in event chaining.
+ *
+ * Usage:
+ *  struct event *next;
+ *  struct event *evbuf = ...
+ *  off_t next_offset = next_after(evbuf);
+ *  read_event(fd, next, next_offset);
+ **/
+off64_t next_after(struct event *evbuf);
+
 #endif /* _YBINLOGP_H_ */
