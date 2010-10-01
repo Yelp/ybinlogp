@@ -34,6 +34,11 @@
 time_t MIN_TIMESTAMP;				/* set to the time in the FDE */
 time_t MAX_TIMESTAMP;				/* Set this time(NULL) on startup */
 
+uint32_t SLAVE_SERVER_ID;
+uint32_t MASTER_SERVER_ID;
+
+int ENFORCE_SERVER_ID = 1;
+
 
 char* event_types[27] = {
 	"UNKNOWN_EVENT",			// 0
@@ -108,7 +113,7 @@ void print_event(struct event *e) {
 	printf("type_code:          %s\n", event_types[e->type_code]);
 	if (q_mode > 1)
 		return;
-	printf("server id:          %d\n", e->server_id);
+	printf("server id:          %u\n", e->server_id);
 	printf("length:             %d\n", e->length);
 	printf("next pos:           %llu\n", (unsigned long long)e->next_position);
 	printf("flags:              ");
@@ -208,11 +213,13 @@ void usage()
 	fprintf(stderr, "\t\tybinlogp -a N -t timestamp logfile\n");
 	fprintf(stderr, "\t-q Be slightly quieter when printing (don't print statement contents\n");
 	fprintf(stderr, "\t-Q Be much quieter (only print offset, timestamp, and type code)\n");
+	fprintf(stderr, "\t-S Remove server-id checks (by default, will only allow 1 slave and 1 master server-id in a log file\n");
 }
 
 int check_event(struct event *e)
 {
-	if (e->server_id < MAX_SERVER_ID &&
+	if ((!ENFORCE_SERVER_ID || (e->server_id == SLAVE_SERVER_ID ||
+			e->server_id == MASTER_SERVER_ID)) &&
 			e->type_code > MIN_TYPE_CODE &&
 			e->type_code < MAX_TYPE_CODE &&
 			e->length > MIN_EVENT_LENGTH &&
@@ -422,10 +429,15 @@ int nearest_time(int fd, time_t target, struct event *outbuf)
 int read_fde(int fd)
 {
 	struct event* evbuf = malloc(sizeof(struct event));
+	off64_t offset;
+	int old_esi = ENFORCE_SERVER_ID;
 	init_event(evbuf);
+
+	ENFORCE_SERVER_ID = 0;
 	if (read_event(fd, evbuf, 4) < 0) {
 		return -1;
 	}
+	ENFORCE_SERVER_ID = old_esi;
 #if DEBUG
 	print_event(evbuf);
 #endif
@@ -435,7 +447,16 @@ int read_fde(int fd)
 		exit(1);
 	}
 	MIN_TIMESTAMP = evbuf->timestamp;
+	SLAVE_SERVER_ID = evbuf->server_id;
+
+	offset = next_after(evbuf);
+	reset_event(evbuf);
+	read_event(fd, evbuf, offset);
+
+	MASTER_SERVER_ID = evbuf->server_id;
 	dispose_event(evbuf);
+
+	lseek(fd, 0, SEEK_SET);
 	return 0;
 }
 
@@ -458,7 +479,7 @@ int main(int argc, char **argv)
 	MAX_TIMESTAMP = time(NULL);
 
 	/* Parse args */
-	while ((opt = getopt(argc, argv, "t:o:a:qQ")) != -1) {
+	while ((opt = getopt(argc, argv, "t:o:a:qQS")) != -1) {
 		switch (opt) {
 			case 't':		/* Time mode */
 				target_time = atol(optarg);
@@ -485,6 +506,9 @@ int main(int argc, char **argv)
 				break;
 			case 'Q':
 				q_mode = 2;
+				break;
+			case 'S':
+				ENFORCE_SERVER_ID = 0;
 				break;
 			case '?':
 				fprintf(stderr, "Unknown argument %c\n", optopt);
