@@ -554,7 +554,8 @@ int main(int argc, char **argv)
 	}
 	else {
 		print_event(evbuf);
-		while ((shown < num_to_show) && (offset > 0) && (evbuf->next_position != evbuf->offset)) {
+		while ((shown < num_to_show) && (offset > 0) && (evbuf->next_position != evbuf->offset) &&
+				(evbuf->next_position != 0)) {
 			/* 
 			 * When we're in a_mode, just use the built-in
 			 * chaining to be BLAZINGLY FASTish
