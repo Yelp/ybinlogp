@@ -4,12 +4,13 @@
  * (C) 2010 Yelp, Inc.
  */
 
-#include <unistd.h>
-#include <sys/types.h>
+#ifndef _YBINLOGP_H_
+#define _YBINLOGP_H_
+
 #include <stdint.h>
+#include <sys/types.h>
 
 #define BINLOG_VERSION 4
-
 
 #define EVENT_HEADER_SIZE 19	/* we tack on extra stuff at the end */
 
@@ -115,3 +116,4 @@ int read_event(int, struct event *, off64_t);
  **/
 int check_event(struct event *);
 
+#endif /* _YBINLOGP_H_ */

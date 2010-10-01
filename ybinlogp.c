@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 #include <assert.h>
 
 #include "ybinlogp.h"
