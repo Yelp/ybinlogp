@@ -91,7 +91,7 @@ EventObjectType = {
 	0,                         /* tp_iter */
 	0,                         /* tp_iternext */
 	EventObject_methods,       /* tp_methods */
-	0,       /* tp_members */
+	EventObject_members,       /* tp_members */
 	0,                         /* tp_getset */
 	0,                         /* tp_base */
 	0,                         /* tp_dict */
