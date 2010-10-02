@@ -1,4 +1,6 @@
 ybinlogp
 *~
 *.o
+\#*#
+\.#*
 build/

@@ -5,6 +5,71 @@
 
 typedef struct {
 	PyObject_HEAD
+	PyObject *file;
+	EventObject *prev_event;
+} ParserObject;
+
+static PyMemberDef
+ParseObject_members[] = {
+	{ "file", T_OBJECT_EX, offsetof(ParserObject, file), READONLY, "underlying file object" },
+//  { "event", T_OBJECT_EX, offsetof(ParserObject, prev_event), READONLY, "the last event read" },
+	{ NULL }
+};
+
+static int
+ParserObject_init(EventObject *self, PyObject *args, PyObject *kwds)
+{
+	off64_t offset;
+	FILE *f;
+	PyObject *file;
+	struct event *evbuf;
+
+	if (!PyArg_ParseTuple(args, "O", &file))
+		return NULL;
+	if (file != NULL) {
+		self->file = file;
+		Py_INCREF(file);
+		f = PyFile_AsFile(file);
+		rewind(f);
+		read_fde(fileno(file));
+
+		self->event = PyObject_New(EventObject, &EventObjectType);
+		offset = nearest_offset(fd, 0, self->event->event, 1);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+static void
+ParserObject_dealloc(ParserObject *self)
+{
+	Py_DECREF(self->file);
+	self->ob_type->tp_free((PyObject *) self);
+}
+
+static PyObject*
+ParserObject_next(EventObject *self, PyObject *args, PyObject *kwds)
+{
+	off64_t offset;
+	EventObject *ev;
+
+	if (self->event->event->next_position != self->event->event->offset) {
+		Py_RETURN_NONE;
+	}
+
+	ev = PyObject_New(EventObject, &EventObjectType);
+	offset = next_after(self->event->event);
+	Py_DECREF(self->event);
+	read_event(fd, ev->event, offset);
+	self->event = ev;
+	Py_INCREF(self->event);
+	return ev;
+}
+
+
+typedef struct {
+	PyObject_HEAD
 	struct event *event;
 	PyObject *data;
 } EventObject;
@@ -25,41 +90,21 @@ EventObject_members[] = {
 static int
 EventObject_init(EventObject *self, PyObject *args, PyObject *kwds)
 {
+	/* must be malloc, not PyMem_Malloc */
+	self->event = malloc(sizeof(struct event));
 	init_event(self->event);
 	self->data = NULL;
 	return 1;
 }
 
-static PyObject*
-EventObject_advance(EventObject *self, PyObject *args, PyObject *kwds)
-{
-	int fd;
-	off64_t offset;
-	if (!PyArg_ParseTuple(args, "i", &fd))
-		return NULL;
-	offset = next_after(self->event);
-	reset_event(self->event);
-	read_event(fd, self->event, offset);
-
-	Py_XDECREF(self->data);
-	self->data = PyByteArray_FromStringAndSize(self->event->data, self->event->length - 19);
-	Py_RETURN_NONE;
-}
-
-
 static void
 EventObject_dealloc(EventObject *self)
 {
+	/* dispose will call free */
 	dispose_event(self->event);
 	Py_XDECREF(self->data);
 	self->ob_type->tp_free((PyObject *) self);
 }
-
-static PyMethodDef
-EventObject_methods[] = {
-	{ "advance", (PyCFunction) EventObject_advance, METH_VARARGS, "advance through a file descriptor" },
-	{ NULL }
-};
 
 static PyTypeObject
 EventObjectType = {
@@ -91,7 +136,7 @@ EventObjectType = {
 	0,                         /* tp_weaklistoffset */
 	0,                         /* tp_iter */
 	0,                         /* tp_iternext */
-	EventObject_methods,       /* tp_methods */
+	0,                         /* tp_methods */
 	EventObject_members,       /* tp_members */
 	0,                         /* tp_getset */
 	0,                         /* tp_base */
@@ -156,7 +201,12 @@ PyMODINIT_FUNC initbinlog(void)
 	EventObjectType.tp_new = PyType_GenericNew;
 	if (PyType_Ready(&EventObjectType) < 0)
 		return;
-
 	Py_INCREF(&EventObjectType);
 	PyModule_AddObject(mod, "Event", (PyObject *) &EventObjectType);
+
+	ParserObjectType.tp_new = PyType_GenericNew;
+	if (PyType_Ready(&ParserObjectType) < 0)
+		return;
+	Py_INCREF(&ParserObjectType);
+	PyModule_AddObject(mod, "BinlogParser", (PyObject *) &ParserObjectType);
 }
