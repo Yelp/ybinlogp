@@ -8,7 +8,7 @@ typedef struct {
 } EventObject;
 
 static PyMemberDef
-Event_members[] = {
+EventObject_members[] = {
 	{"timestamp", T_UINT, offsetof(EventObject, event) + offsetof(event, timestamp), 0, "timestamp"},
 	{"type_code", T_UINT, offsetof(EventObject, event) + offsetof(event, type_code), 0, "type_code"},
 	{"server_id", T_UINT, offsetof(EventObject, event) + offsetof(event, server_id), 0, "server_id"},
@@ -90,7 +90,7 @@ EventObjectType = {
 	0,                         /* tp_iter */
 	0,                         /* tp_iternext */
 	EventObject_methods,       /* tp_methods */
-	0,       /* tp_members */
+	EventObject_members,       /* tp_members */
 	0,                         /* tp_getset */
 	0,                         /* tp_base */
 	0,                         /* tp_dict */
