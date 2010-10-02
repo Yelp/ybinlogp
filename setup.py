@@ -9,8 +9,7 @@ define_macros = [('MODULE_VERSION', '"%s"' % __version__)]
 
 binlog_extension = Extension(
 	name='binlog',
-	sources=['pybinlog.c'],
-	extra_objects=['./ybinlogp.o'],
+	sources=['ybinlogp.c', 'pybinlog.c'],
 	define_macros=define_macros)
 
 setup(

@@ -1,5 +1,6 @@
 #include <Python.h>
 #include <structmember.h>
+#include <stddef.h>
 #include "ybinlogp.h"
 
 typedef struct {
