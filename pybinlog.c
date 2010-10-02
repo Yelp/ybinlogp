@@ -1,4 +1,5 @@
 #include <Python.h>
+#include <structmember.h>
 #include "ybinlogp.h"
 
 typedef struct {
@@ -8,7 +9,7 @@ typedef struct {
 } EventObject;
 
 static PyMemberDef
-Event_members[] = {
+EventObject_members[] = {
 	{"timestamp", T_UINT, offsetof(EventObject, event) + offsetof(event, timestamp), 0, "timestamp"},
 	{"type_code", T_UINT, offsetof(EventObject, event) + offsetof(event, type_code), 0, "type_code"},
 	{"server_id", T_UINT, offsetof(EventObject, event) + offsetof(event, server_id), 0, "server_id"},

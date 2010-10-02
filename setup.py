@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from distutils.core import setup, Extension
 
 __version__ = '0.1.0'
