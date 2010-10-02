@@ -10,14 +10,14 @@ typedef struct {
 
 static PyMemberDef
 EventObject_members[] = {
-	{"timestamp", T_UINT, offsetof(EventObject, event) + offsetof(event, timestamp), 0, "timestamp"},
-	{"type_code", T_UINT, offsetof(EventObject, event) + offsetof(event, type_code), 0, "type_code"},
-	{"server_id", T_UINT, offsetof(EventObject, event) + offsetof(event, server_id), 0, "server_id"},
-	{"length", T_UINT, offsetof(EventObject, event) + offsetof(event, length), 0, "length"},
-	{"next_position", T_UINT, offsetof(EventObject, event) + offsetof(event, next_position), 0, "next_position"},
-	{"flags", T_UINT, offsetof(EventObject, event) + offsetof(event, flags), 0, "flags"},
-	{"data", T_OBJECT_EXC, offsetof(EventObject, data),  0, "flags"},
-	{"offset", T_UINT, offsetof(EventObject, event) + offsetof(event, offset), 0, "offset"},
+	{"timestamp", T_UINT, offsetof(EventObject, event) + offsetof(struct event, timestamp), 0, "timestamp"},
+	{"type_code", T_UINT, offsetof(EventObject, event) + offsetof(struct event, type_code), 0, "type_code"},
+	{"server_id", T_UINT, offsetof(EventObject, event) + offsetof(struct event, server_id), 0, "server_id"},
+	{"length", T_UINT, offsetof(EventObject, event) + offsetof(struct event, length), 0, "length"},
+	{"next_position", T_UINT, offsetof(EventObject, event) + offsetof(struct event, next_position), 0, "next_position"},
+	{"flags", T_UINT, offsetof(EventObject, event) + offsetof(struct event, flags), 0, "flags"},
+	{"data", T_OBJECT_EX, offsetof(EventObject, data),  0, "flags"},
+	{"offset", T_UINT, offsetof(EventObject, event) + offsetof(struct event, offset), 0, "offset"},
 	{NULL} /* Sentinel */
 };
 
