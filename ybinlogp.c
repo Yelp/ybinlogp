@@ -192,7 +192,7 @@ void print_event(struct event *e) {
 	}
 }
 
-void usage()
+void usage(void)
 {
 	fprintf(stderr, "Usage: ybinlogp [mode] logfile [mode-args]\n");
 	fprintf(stderr, "\n");
