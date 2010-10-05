@@ -128,4 +128,8 @@ int check_event(struct event *);
  **/
 off64_t next_after(struct event *evbuf);
 
+/* XXX: lol, undocumented */
+int read_fde(int);
+off64_t nearest_offset(int, off64_t, struct event *, int);
+
 #endif /* _YBINLOGP_H_ */

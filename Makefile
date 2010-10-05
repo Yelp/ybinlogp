@@ -12,5 +12,6 @@ force:: clean all
 
 clean::
 	rm -f $(TARGETS) *.o
+	rm -rf build
 
 ybinlogp.o: ybinlogp.c ybinlogp.h
