@@ -111,7 +111,7 @@ ParserObject_init(ParserObject *self, PyObject *args, PyObject *kwds)
 		self->file = file;
 		Py_INCREF(file);
 		f = PyFile_AsFile(file);
-		rewind(f);
+		//rewind(f);
 
 		fd = fileno(f);
 		read_fde(fd);
@@ -152,7 +152,7 @@ ParserObject_next(ParserObject *self, PyObject *args, PyObject *kwds)
 
 static PyMethodDef
 ParserObject_methods[] = {
-    {"next", ParserObject_next, METH_VARARGS, "iterate through the binlog" },
+    {"next", (PyCFunction) ParserObject_next, METH_VARARGS, "iterate through the binlog" },
     {NULL, NULL, 0, NULL} /* Sentinel */
 };
 
@@ -162,7 +162,7 @@ static PyTypeObject
 ParserObjectType = {
 	PyObject_HEAD_INIT(NULL)
 	0,                         /* ob_size */
-	"Parser",                  /* tp_name */
+	"BinlogParser",                  /* tp_name */
 	sizeof(ParserObject),      /* tp_basicsize */
 	0,                         /* tp_itemsize */
 	(destructor)ParserObject_dealloc, /* tp_dealloc */

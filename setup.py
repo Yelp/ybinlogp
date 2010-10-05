@@ -4,8 +4,8 @@ from distutils.core import setup, Extension
 
 __version__ = '0.1.0'
 
-#define_macros = [('MODULE_VERSION', '"%s"' % __version__), ('DEBUG', None)]
-define_macros = [('MODULE_VERSION', '"%s"' % __version__)]
+define_macros = [('MODULE_VERSION', '"%s"' % __version__), ('DEBUG', None)]
+#define_macros = [('MODULE_VERSION', '"%s"' % __version__)]
 
 binlog_extension = Extension(
 	name='binlog',

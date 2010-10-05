@@ -226,7 +226,7 @@ int check_event(struct event *e)
 int read_event(int fd, struct event *evbuf, off64_t offset)
 {
 	ssize_t amt_read;
-	if ((lseek(fd, offset, SEEK_SET) < 0)) {
+	if ((lseek64(fd, offset, SEEK_SET) < 0)) {
 		perror("Error seeking");
 		return -1;
 	}
@@ -420,6 +420,8 @@ int nearest_time(int fd, time_t target, struct event *outbuf)
 int read_fde(int fd)
 {
 	struct event* evbuf = malloc(sizeof(struct event));
+	if (evbuf == NULL)
+		return -1;
 	init_event(evbuf);
 	if (read_event(fd, evbuf, 4) < 0) {
 		return -1;
@@ -428,6 +430,11 @@ int read_fde(int fd)
 	print_event(evbuf);
 #endif
 	struct format_description_event *f = (struct format_description_event*) evbuf->data;
+	if (f == NULL) {
+		fprintf(stderr, "Fatal error: FDE had no data field!\n");
+		dispose_event(evbuf);
+		return -1;
+	}
 	if (f->format_version != BINLOG_VERSION) {
 		fprintf(stderr, "Invalid binlog! Expected version %d, got %d\n", BINLOG_VERSION, f->format_version);
 		exit(1);
