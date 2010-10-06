@@ -415,9 +415,11 @@ int nearest_time(int fd, time_t target, struct event *outbuf)
 /**
  * Read the FDE and set the server-id
  **/
-int read_fde(int fd)
+int read_fde(int fd, struct event *evbuf)
 {
-	struct event* evbuf = malloc(sizeof(struct event));
+	int did_alloc = evbuf == NULL ? 1 : 0;
+	if (did_alloc)
+		evbuf = malloc(sizeof(struct event));
 	if (evbuf == NULL)
 		return -1;
 	init_event(evbuf);
@@ -438,7 +440,8 @@ int read_fde(int fd)
 		exit(1);
 	}
 	MIN_TIMESTAMP = evbuf->timestamp;
-	dispose_event(evbuf);
+	if (did_alloc)
+		dispose_event(evbuf);
 	return 0;
 }
 
@@ -523,7 +526,7 @@ int main(int argc, char **argv)
 		perror("Error opening file");
 		return 1;
 	}
-	read_fde(fd);
+	read_fde(fd, NULL);
 	exit_status = 0;
 	if (t_mode) {
 		offset = nearest_time(fd, target_time, evbuf);

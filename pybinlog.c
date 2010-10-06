@@ -5,14 +5,14 @@
 
 typedef struct {
 	PyObject_HEAD
-	struct event *event;
+	struct event event;
 	PyObject *data;
 } EventObject;
 
 static PyMemberDef
 EventObject_members[] = {
 	{"timestamp", T_UINT, offsetof(EventObject, event) + offsetof(struct event, timestamp), 0, "timestamp"},
-	{"type_code", T_UINT, offsetof(EventObject, event) + offsetof(struct event, type_code), 0, "type_code"},
+	{"type_code", T_BYTE, offsetof(EventObject, event) + offsetof(struct event, type_code), 0, "type_code"},
 	{"server_id", T_UINT, offsetof(EventObject, event) + offsetof(struct event, server_id), 0, "server_id"},
 	{"length", T_UINT, offsetof(EventObject, event) + offsetof(struct event, length), 0, "length"},
 	{"next_position", T_UINT, offsetof(EventObject, event) + offsetof(struct event, next_position), 0, "next_position"},
@@ -25,9 +25,7 @@ EventObject_members[] = {
 static int
 EventObject_init(EventObject *self, PyObject *args, PyObject *kwds)
 {
-	/* must be malloc, not PyMem_Malloc */
-	self->event = malloc(sizeof(struct event));
-	init_event(self->event);
+	memset(&self->event, 0, sizeof(struct event));
 	self->data = NULL;
 	return 1;
 }
@@ -36,7 +34,12 @@ static void
 EventObject_dealloc(EventObject *self)
 {
 	/* dispose will call free */
-	dispose_event(self->event);
+#ifdef DEBUG
+	fprintf(stderr, "deallocing event %p\n", self);
+#endif
+	if (self->event.data != NULL) {
+		free(self->event.data);
+	}
 	Py_XDECREF(self->data);
 	self->ob_type->tp_free((PyObject *) self);
 }
@@ -100,7 +103,6 @@ static int
 ParserObject_init(ParserObject *self, PyObject *args, PyObject *kwds)
 {
 	int fd;
-	off64_t offset;
 	FILE *f;
 	PyObject *file;
 
@@ -112,10 +114,11 @@ ParserObject_init(ParserObject *self, PyObject *args, PyObject *kwds)
 		Py_INCREF(file);
 		f = PyFile_AsFile(file);
 		fd = fileno(f);
-		read_fde(fd);
 
 		self->event = PyObject_New(EventObject, &EventObjectType);
 		EventObject_init(self->event, NULL, NULL);
+		read_fde(fd, &(self->event->event));
+		//fprintf(stderr, "pybinlog.c: fde offset is %d, next_position is %d\n", self->event->event->offset, self->event->event->next_position);
 		//offset = nearest_offset(fd, 5, self->event->event, 1);
 		return 1;
 	} else {
@@ -136,18 +139,18 @@ ParserObject_next(ParserObject *self, PyObject *args, PyObject *kwds)
 	off64_t offset;
 	EventObject *ev;
 
-	if (self->event->event->next_position && self->event->event->next_position != self->event->event->offset) {
-		Py_RETURN_NONE;
-	}
+	if ((PyObject *) self->event != Py_None) {
+		ev = self->event;
+		self->event = PyObject_New(EventObject, &EventObjectType);
+		EventObject_init(self->event, NULL, NULL);
+		offset = next_after(&ev->event);
+		read_event(fileno(PyFile_AsFile(self->file)), &(self->event->event), offset);
+		Py_INCREF(self->event);
 
-	ev = PyObject_New(EventObject, &EventObjectType);
-	EventObject_init(ev, NULL, NULL);
-	offset = next_after(self->event->event);
-	Py_DECREF(self->event);
-	read_event(fileno(PyFile_AsFile(self->file)), ev->event, offset);
-	self->event = ev;
-	Py_INCREF(self->event);
-	return (PyObject *)ev;
+		Py_DECREF(ev);
+		return (PyObject *)ev;
+	} else
+		Py_RETURN_NONE;
 }
 
 static PyMethodDef
