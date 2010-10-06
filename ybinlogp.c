@@ -28,7 +28,7 @@
 #define MAX_TYPE_CODE 27
 #define MIN_EVENT_LENGTH 19
 #define MAX_EVENT_LENGTH 10485760		/* Can't see why you'd have events >10MB. */
-#define MAX_SERVER_ID 4294967295		/* 0 <= server_id  <= 2**31 */
+#define MAX_SERVER_ID 4294967295		/* This is documented as [0, 2^31) but MySQL really treats it as unsigned */
 time_t MIN_TIMESTAMP;				/* set to the time in the FDE */
 time_t MAX_TIMESTAMP;				/* Set this time(NULL) on startup */
 
@@ -106,7 +106,7 @@ void print_event(struct event *e) {
 	printf("type_code:          %s\n", event_types[e->type_code]);
 	if (q_mode > 1)
 		return;
-	printf("server id:          %d\n", e->server_id);
+	printf("server id:          %u\n", e->server_id);
 	printf("length:             %d\n", e->length);
 	printf("next pos:           %llu\n", (unsigned long long)e->next_position);
 	printf("flags:              ");
@@ -210,8 +210,7 @@ void usage(void)
 
 int check_event(struct event *e)
 {
-	if (e->server_id < MAX_SERVER_ID &&
-			e->type_code > MIN_TYPE_CODE &&
+	if (e->type_code > MIN_TYPE_CODE &&
 			e->type_code < MAX_TYPE_CODE &&
 			e->length > MIN_EVENT_LENGTH &&
 			e->length < MAX_EVENT_LENGTH && 
@@ -232,7 +231,7 @@ int read_event(int fd, struct event *evbuf, off64_t offset)
 	}
 	amt_read = read(fd, (void*)evbuf, EVENT_HEADER_SIZE);
 	evbuf->offset = offset;
-	evbuf->data = 0;
+	evbuf->data = NULL;
 	if (amt_read < 0) {
 		fprintf(stderr, "Error reading event at %lld: %s\n", (long long) offset, strerror(errno));
 		return -1;
@@ -444,6 +443,14 @@ int read_fde(int fd)
 	return 0;
 }
 
+int
+init_ybinlogp(void)
+{
+	MAX_TIMESTAMP = time(NULL);
+	return 0;
+}
+
+
 int main(int argc, char **argv)
 {
 	int fd, exit_status;
@@ -460,7 +467,7 @@ int main(int argc, char **argv)
 	int t_mode = 0;
 	int o_mode = 1;
 
-	MAX_TIMESTAMP = time(NULL);
+	init_ybinlogp();
 
 	/* Parse args */
 	while ((opt = getopt(argc, argv, "t:o:a:qQ")) != -1) {

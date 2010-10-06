@@ -205,6 +205,7 @@ ParserObjectType = {
 PyMODINIT_FUNC initbinlog(void)
 {
 	PyObject *mod;
+	init_ybinlogp();
 
 	mod = Py_InitModule3("binlog", NULL, "test");
 	if (mod == NULL)
