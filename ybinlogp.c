@@ -28,7 +28,6 @@
 #define MAX_TYPE_CODE 27
 #define MIN_EVENT_LENGTH 19
 #define MAX_EVENT_LENGTH 10485760		/* Can't see why you'd have events >10MB. */
-#define MAX_SERVER_ID 4294967295		/* This is documented as [0, 2^31) but MySQL really treats it as unsigned */
 time_t MIN_TIMESTAMP;				/* set to the time in the FDE */
 time_t MAX_TIMESTAMP;				/* Set this time(NULL) on startup */
 

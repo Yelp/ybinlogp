@@ -111,13 +111,12 @@ ParserObject_init(ParserObject *self, PyObject *args, PyObject *kwds)
 		self->file = file;
 		Py_INCREF(file);
 		f = PyFile_AsFile(file);
-		//rewind(f);
-
 		fd = fileno(f);
 		read_fde(fd);
 
 		self->event = PyObject_New(EventObject, &EventObjectType);
-		offset = nearest_offset(fd, 0, self->event->event, 1);
+		EventObject_init(self->event, NULL, NULL);
+		//offset = nearest_offset(fd, 5, self->event->event, 1);
 		return 1;
 	} else {
 		return 0;
@@ -137,11 +136,12 @@ ParserObject_next(ParserObject *self, PyObject *args, PyObject *kwds)
 	off64_t offset;
 	EventObject *ev;
 
-	if (self->event->event->next_position != self->event->event->offset) {
+	if (self->event->event->next_position && self->event->event->next_position != self->event->event->offset) {
 		Py_RETURN_NONE;
 	}
 
 	ev = PyObject_New(EventObject, &EventObjectType);
+	EventObject_init(ev, NULL, NULL);
 	offset = next_after(self->event->event);
 	Py_DECREF(self->event);
 	read_event(fileno(PyFile_AsFile(self->file)), ev->event, offset);
