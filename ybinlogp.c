@@ -106,7 +106,7 @@ void print_event(struct event *e) {
 	printf("type_code:          %s\n", event_types[e->type_code]);
 	if (q_mode > 1)
 		return;
-	printf("server id:          %d\n", e->server_id);
+	printf("server id:          %u\n", e->server_id);
 	printf("length:             %d\n", e->length);
 	printf("next pos:           %llu\n", (unsigned long long)e->next_position);
 	printf("flags:              ");
@@ -232,7 +232,7 @@ int read_event(int fd, struct event *evbuf, off64_t offset)
 	}
 	amt_read = read(fd, (void*)evbuf, EVENT_HEADER_SIZE);
 	evbuf->offset = offset;
-	evbuf->data = 0;
+	evbuf->data = NULL;
 	if (amt_read < 0) {
 		fprintf(stderr, "Error reading event at %lld: %s\n", (long long) offset, strerror(errno));
 		return -1;
