@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include "ybinlogp.h"
 
+#define LLU_TYPE         unsigned long long
+
 /***********
  * FORMAT DESCRIPTION EVENTS
  **********/
@@ -15,7 +17,7 @@ typedef struct {
 static PyMemberDef
 FormatDescriptionEventObject_members[] = {
 	{"format_version", T_SHORT, offsetof(FormatDescriptionEventObject, fde) + offsetof(struct format_description_event, format_version), READONLY, "The MySQL binlog format version"},
-	{"server_version", T_STRING, offsetof(FormatDescriptionEventObject, fde) + offsetof(struct format_description_event, server_version), READONLY, "The MySQL server version"},
+	//{"server_version", T_STRING, offsetof(FormatDescriptionEventObject, fde) + offsetof(struct format_description_event, server_version), READONLY, "The MySQL server version"},
 	{"timestamp", T_UINT, offsetof(FormatDescriptionEventObject, fde) + offsetof(struct format_description_event, timestamp), READONLY, "The timestamp for the binlog"},
 	{"header_len", T_UBYTE, offsetof(FormatDescriptionEventObject, fde) + offsetof(struct format_description_event, header_len), READONLY, "The length of header fields"},
 	{NULL}
@@ -26,6 +28,15 @@ FormatDescriptionEventObject_init(FormatDescriptionEventObject *self, PyObject *
 {
 	memset(&self->fde, 0, sizeof(struct format_description_event));
 	return 1;
+}
+
+static PyObject*
+FormatDescriptionEventObject_repr(FormatDescriptionEventObject *self)
+{
+	return PyString_FromFormat("FormatDescriptionEvent(format_version=%d, timestamp=%d, header_len=%d)",
+							   self->fde.format_version,
+							   self->fde.timestamp,
+							   self->fde.header_len);
 }
 
 static PyTypeObject
@@ -40,7 +51,7 @@ FormatDescriptionEventObjectType = {
 	0,                               /* tp_getattr */
 	0,                               /* tp_setattr */
 	0,                               /* tp_compare */
-	0,                               /* tp_repr */
+	(reprfunc) FormatDescriptionEventObject_repr, /* tp_repr */
 	0,                               /* tp_as_number */
 	0,                               /* tp_as_sequence */
 	0,                               /* tp_as_mapping */
@@ -113,6 +124,7 @@ QueryEventObject_dealloc(QueryEventObject *self)
 {
 	Py_DECREF(self->db_name);
 	Py_DECREF(self->query_text);
+	self->ob_type->tp_free((PyObject *) self);
 }
 
 static PyObject*
@@ -195,12 +207,19 @@ RotateEventObject_init(RotateEventObject *self, PyObject *args, PyObject *kwds)
 	return 1;
 }
 
+static void
+RotateEventObject_dealloc(RotateEventObject *self)
+{
+	Py_DECREF(self->next_file);
+	self->ob_type->tp_free((PyObject *) self);
+}
+
 static PyObject *
 RotateEventObject_repr(RotateEventObject *self)
 {
 	return PyString_FromFormat("RotateEvent(next_file=%s, next_position=%llu)",
 							   PyString_AsString(PyObject_Repr(self->next_file)),
-							   self->rotate.next_position);
+							   (LLU_TYPE) self->rotate.next_position);
 }
 
 static PyTypeObject
@@ -210,12 +229,12 @@ RotateEventObjectType = {
 	"RotateEvent",                   /* tp_name */
 	sizeof(RotateEventObject),       /* tp_basicsize */
 	0,                               /* tp_itemsize */
-	0,                               /* tp_dealloc */
+	(destructor) RotateEventObject_dealloc, /* tp_dealloc */
 	0,                               /* tp_print */
 	0,                               /* tp_getattr */
 	0,                               /* tp_setattr */
 	0,                               /* tp_compare */
-	(reprfunc)RotateEventObject_repr, /* tp_repr */
+	(reprfunc) RotateEventObject_repr, /* tp_repr */
 	0,                               /* tp_as_number */
 	0,                               /* tp_as_sequence */
 	0,                               /* tp_as_mapping */
@@ -241,12 +260,10 @@ RotateEventObjectType = {
 	0,                               /* tp_descr_get */
 	0,                               /* tp_descr_set */
 	0,                               /* tp_dictoffset */
-	(initproc)RotateEventObject_init, /* tp_init */
+	(initproc) RotateEventObject_init, /* tp_init */
 	0,                               /* tp_alloc */
 	0,                               /* tp_new */
 };
-
-
 
 typedef struct {
 	PyObject_HEAD
@@ -345,7 +362,6 @@ typedef struct {
 static PyMemberDef
 ParserObject_members[] = {
 	{ "file", T_OBJECT_EX, offsetof(ParserObject, file), READONLY, "underlying file object" },
-//  { "event", T_OBJECT_EX, offsetof(ParserObject, prev_event), READONLY, "the last event read" },
 	{ NULL }
 };
 static int
@@ -401,7 +417,7 @@ ParserObject_next(ParserObject *self, PyObject *args, PyObject *kwds)
 	off64_t offset;
 	EventObject *ev;
 
-	if ((PyObject *) self->event != Py_None) {
+	if ((PyObject *) self->event != NULL) {
 		ev = self->event;
 		//if (ev->data == NULL)
 		//ev->data = PyString_FromStringAndSize(ev->event.data, ev->event.length - 19);
@@ -418,8 +434,7 @@ ParserObject_next(ParserObject *self, PyObject *args, PyObject *kwds)
 
 		case 0: /* log parsing has ended */
 			Py_DECREF(self->event);
-			self->event = Py_None;
-			Py_INCREF(self->event);
+			self->event = NULL;
 			break;
 		case 2: /* EVENT_QUERY */
 			Py_DECREF(self->event->data);
