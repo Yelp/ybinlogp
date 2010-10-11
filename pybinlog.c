@@ -3,9 +3,9 @@
 #include <stddef.h>
 #include "ybinlogp.h"
 
-/**
+/***********
  * FORMAT DESCRIPTION EVENTS
- **/
+ **********/
 
 typedef struct {
 	PyObject_HEAD
@@ -71,6 +71,183 @@ FormatDescriptionEventObjectType = {
 	0,                               /* tp_new */
 };
 
+/***********
+ * QUERY EVENTS
+ **********/
+
+typedef struct {
+	PyObject_HEAD
+	struct query_event query;
+	PyObject *db_name;
+	PyObject *query_text;
+} QueryEventObject;
+
+static PyMemberDef
+QueryEventObject_members[] = {
+	{"thread_id", T_UINT, offsetof(QueryEventObject, query) + offsetof(struct query_event, thread_id), READONLY, "The MySQL thread ID"},
+	{"query_time", T_UINT, offsetof(QueryEventObject, query) + offsetof(struct query_event, query_time), READONLY, "The query time, measured in seconds"},
+	// db_name_len omitted
+	{"error_code", T_USHORT, offsetof(QueryEventObject, query) + offsetof(struct query_event, error_code), READONLY, "The query's error code"},
+	{"database_name", T_OBJECT_EX, offsetof(QueryEventObject, db_name), READONLY, "The database name"},
+	{"query_text", T_OBJECT_EX, offsetof(QueryEventObject, query_text), READONLY, "The query text"},
+	{NULL}
+};
+
+
+static int
+QueryEventObject_init(QueryEventObject *self, PyObject *args, PyObject *kwds)
+{
+	memset(&self->query, 0, sizeof(struct query_event));
+
+	self->db_name = Py_None;
+	Py_INCREF(Py_None);
+
+	self->query_text = Py_None;
+	Py_INCREF(Py_None);
+
+	return 1;
+}
+
+static void
+QueryEventObject_dealloc(QueryEventObject *self)
+{
+	Py_DECREF(self->db_name);
+	Py_DECREF(self->query_text);
+}
+
+static PyObject*
+QueryEventObject_repr(QueryEventObject *self)
+{
+	return PyString_FromFormat("QueryEvent(db_name=%s, thread_id=%d, query_time=%d, query_text=%s)",
+							   PyString_AsString(PyObject_Repr(self->db_name)),
+							   self->query.thread_id,
+							   self->query.query_time,
+							   PyString_AsString(PyObject_Repr(self->query_text)));
+}
+
+static PyTypeObject
+QueryEventObjectType = {
+	PyObject_HEAD_INIT(NULL)
+	0,                               /* ob_size */
+	"QueryEvent",                    /* tp_name */
+	sizeof(QueryEventObject),        /* tp_basicsize */
+	0,                               /* tp_itemsize */
+	(destructor) QueryEventObject_dealloc, /* tp_dealloc */
+	0,                               /* tp_print */
+	0,                               /* tp_getattr */
+	0,                               /* tp_setattr */
+	0,                               /* tp_compare */
+	(reprfunc) QueryEventObject_repr, /* tp_repr */
+	0,                               /* tp_as_number */
+	0,                               /* tp_as_sequence */
+	0,                               /* tp_as_mapping */
+	0,                               /* tp_hash */
+	0,                               /* tp_call */
+	0,                               /* tp_str */
+	0,                               /* tp_getattro */
+	0,                               /* tp_setattro */
+	0,                               /* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags*/
+	"MySQL query event",             /* tp_doc */
+	0,                               /* tp_traverse */
+	0,                               /* tp_clear */
+	0,                               /* tp_richcompare */
+	0,                               /* tp_weaklistoffset */
+	0,                               /* tp_iter */
+	0,                               /* tp_iternext */
+	0,                               /* tp_methods */
+	QueryEventObject_members, /* tp_members */
+	0,                               /* tp_getset */
+	0,                               /* tp_base */
+	0,                               /* tp_dict */
+	0,                               /* tp_descr_get */
+	0,                               /* tp_descr_set */
+	0,                               /* tp_dictoffset */
+	(initproc)QueryEventObject_init, /* tp_init */
+	0,                               /* tp_alloc */
+	0,                               /* tp_new */
+};
+
+/***********
+ * ROTATE EVENTS
+ **********/
+
+typedef struct {
+	PyObject_HEAD
+	struct rotate_event rotate;
+	PyObject *next_file;
+} RotateEventObject;
+
+static PyMemberDef
+RotateEventObject_members[] = {
+	{"next_position", T_ULONGLONG, offsetof(RotateEventObject, rotate) + offsetof(struct rotate_event, next_position), READONLY, "The binlog position within the next file"},
+	{"next_file", T_OBJECT_EX, offsetof(RotateEventObject, next_file), READONLY, "The name of the next binlog"},
+	{NULL}
+};
+
+
+static int
+RotateEventObject_init(RotateEventObject *self, PyObject *args, PyObject *kwds)
+{
+	memset(&self->rotate, 0, sizeof(struct rotate_event));
+	self->next_file = Py_None;
+	Py_INCREF(Py_None);
+	return 1;
+}
+
+static PyObject *
+RotateEventObject_repr(RotateEventObject *self)
+{
+	return PyString_FromFormat("RotateEvent(next_file=%s, next_position=%llu)",
+							   PyString_AsString(PyObject_Repr(self->next_file)),
+							   self->rotate.next_position);
+}
+
+static PyTypeObject
+RotateEventObjectType = {
+	PyObject_HEAD_INIT(NULL)
+	0,                               /* ob_size */
+	"RotateEvent",                   /* tp_name */
+	sizeof(RotateEventObject),       /* tp_basicsize */
+	0,                               /* tp_itemsize */
+	0,                               /* tp_dealloc */
+	0,                               /* tp_print */
+	0,                               /* tp_getattr */
+	0,                               /* tp_setattr */
+	0,                               /* tp_compare */
+	(reprfunc)RotateEventObject_repr, /* tp_repr */
+	0,                               /* tp_as_number */
+	0,                               /* tp_as_sequence */
+	0,                               /* tp_as_mapping */
+	0,                               /* tp_hash */
+	0,                               /* tp_call */
+	0,                               /* tp_str */
+	0,                               /* tp_getattro */
+	0,                               /* tp_setattro */
+	0,                               /* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags*/
+	"MySQL log rotate event",        /* tp_doc */
+	0,                               /* tp_traverse */
+	0,                               /* tp_clear */
+	0,                               /* tp_richcompare */
+	0,                               /* tp_weaklistoffset */
+	0,                               /* tp_iter */
+	0,                               /* tp_iternext */
+	0,                               /* tp_methods */
+	RotateEventObject_members,       /* tp_members */
+	0,                               /* tp_getset */
+	0,                               /* tp_base */
+	0,                               /* tp_dict */
+	0,                               /* tp_descr_get */
+	0,                               /* tp_descr_set */
+	0,                               /* tp_dictoffset */
+	(initproc)RotateEventObject_init, /* tp_init */
+	0,                               /* tp_alloc */
+	0,                               /* tp_new */
+};
+
+
+
 typedef struct {
 	PyObject_HEAD
 	struct event event;
@@ -110,6 +287,12 @@ EventObject_dealloc(EventObject *self)
 	self->ob_type->tp_free((PyObject *) self);
 }
 
+static PyObject*
+EventObject_repr(EventObject *self)
+{
+	return PyString_FromFormat("EventObject(data=%s)", PyString_AsString(PyObject_Repr(self->data)));
+}
+
 static PyTypeObject
 EventObjectType = {
 	PyObject_HEAD_INIT(NULL)
@@ -117,12 +300,12 @@ EventObjectType = {
 	"Event",                   /* tp_name */
 	sizeof(EventObject),       /* tp_basicsize */
 	0,                         /* tp_itemsize */
-	(destructor)EventObject_dealloc, /* tp_dealloc */
+	(destructor) EventObject_dealloc, /* tp_dealloc */
 	0,                         /* tp_print */
 	0,                         /* tp_getattr */
 	0,                         /* tp_setattr */
 	0,                         /* tp_compare */
-	0,                         /* tp_repr */
+	(reprfunc) EventObject_repr, /* tp_repr */
 	0,                         /* tp_as_number */
 	0,                         /* tp_as_sequence */
 	0,                         /* tp_as_mapping */
@@ -183,17 +366,15 @@ ParserObject_init(ParserObject *self, PyObject *args, PyObject *kwds)
 
 		self->event = PyObject_New(EventObject, &EventObjectType);
 		EventObject_init(self->event, NULL, NULL);
-		Py_DECREF(self->event->data); /* should decref None */
 
 		read_fde(fd, &(self->event->event));
 
-		/*
+		Py_DECREF(self->event->data); /* should decref None */
 		self->event->data = (PyObject *) PyObject_New(FormatDescriptionEventObject, &FormatDescriptionEventObjectType);
 		FormatDescriptionEventObject_init((FormatDescriptionEventObject *)self->event->data, NULL, NULL);
-		memcpy(&((FormatDescriptionEventObject *) self->event->data)->fde,
-			   format_description_event_data(&self->event->event),
-			   format_description_event_data_len(&self->event->event));
-		*/
+
+		/* XXX: can't access .server_version after this */
+		memcpy(&((FormatDescriptionEventObject *) self->event->data)->fde, self->event->event.data, sizeof(struct format_description_event));
 
 		return 1;
 	} else {
@@ -209,6 +390,12 @@ ParserObject_dealloc(ParserObject *self)
 }
 
 static PyObject*
+ParserObject_iter(ParserObject *self)
+{
+	return (PyObject *) self;
+}
+
+static PyObject*
 ParserObject_next(ParserObject *self, PyObject *args, PyObject *kwds)
 {
 	off64_t offset;
@@ -221,24 +408,61 @@ ParserObject_next(ParserObject *self, PyObject *args, PyObject *kwds)
 
 		self->event = PyObject_New(EventObject, &EventObjectType);
 		EventObject_init(self->event, NULL, NULL);
+
 		offset = next_after(&ev->event);
 		read_event(fileno(PyFile_AsFile(self->file)), &(self->event->event), offset);
+
 		Py_INCREF(self->event);
 
-#if 0
-		Py_DECREF(self->event); /* should decref None */
 		switch(self->event->event.type_code) {
+
+		case 0: /* log parsing has ended */
+			Py_DECREF(self->event);
+			self->event = Py_None;
+			Py_INCREF(self->event);
+			break;
 		case 2: /* EVENT_QUERY */
-			if (self->event->event.type_code == 2)
-				fprintf(stderr, "zomg query");
+			Py_DECREF(self->event->data);
+			self->event->data = (PyObject *) PyObject_New(QueryEventObject, &QueryEventObjectType);
+			QueryEventObject_init((QueryEventObject *) self->event->data, NULL, NULL);
+
+			memcpy(&((QueryEventObject *) self->event->data)->query, self->event->event.data, sizeof(struct query_event));
+
+			Py_DECREF(((QueryEventObject *) self->event->data)->db_name);
+			((QueryEventObject *) self->event->data)->db_name = PyString_FromStringAndSize(
+				query_event_db_name(&self->event->event),
+				((struct query_event *) self->event->event.data)->db_name_len);
+
+			Py_DECREF(((QueryEventObject *) self->event->data)->query_text);
+			((QueryEventObject *) self->event->data)->query_text = PyString_FromStringAndSize(
+				query_event_statement(&self->event->event),
+				query_event_statement_len(&self->event->event));
+
+			break;
+		case 4: /* ROTATE EVENT */
+			Py_DECREF(self->event->data);
+			self->event->data = (PyObject *) PyObject_New(RotateEventObject, &RotateEventObjectType);
+			RotateEventObject_init((RotateEventObject *) self->event->data, NULL, NULL);
+
+			memcpy(&((RotateEventObject *) self->event->data)->rotate, self->event->event.data, sizeof(struct rotate_event));
+
+			Py_DECREF(((RotateEventObject *) self->event->data)->next_file);
+			((RotateEventObject *) self->event->data)->next_file = PyString_FromStringAndSize(
+				rotate_event_file_name(&self->event->event),
+				rotate_event_file_name_len(&self->event->event));
+
+			break;
+
+		default:
+			//fprintf(stderr, "type_code is %d\n", self->event->event.type_code);
 			break;
 		}
-#endif
 
 		//Py_DECREF(ev);
-		return (PyObject *)ev;
-	} else
-		Py_RETURN_NONE;
+		return (PyObject *) ev;
+	} else {
+		return NULL;
+	}
 }
 
 static PyMethodDef
@@ -256,7 +480,7 @@ ParserObjectType = {
 	"BinlogParser",                  /* tp_name */
 	sizeof(ParserObject),      /* tp_basicsize */
 	0,                         /* tp_itemsize */
-	(destructor)ParserObject_dealloc, /* tp_dealloc */
+	(destructor) ParserObject_dealloc, /* tp_dealloc */
 	0,                         /* tp_print */
 	0,                         /* tp_getattr */
 	0,                         /* tp_setattr */
@@ -277,8 +501,8 @@ ParserObjectType = {
 	0,                         /* tp_clear */
 	0,                         /* tp_richcompare */
 	0,                         /* tp_weaklistoffset */
-	0,                         /* tp_iter */
-	0,                         /* tp_iternext */
+	(getiterfunc) ParserObject_iter, /* tp_iter */
+	(iternextfunc) ParserObject_next, /* tp_iternext */
 	ParserObject_methods,      /* tp_methods */
 	ParserObject_members,      /* tp_members */
 	0,                         /* tp_getset */
@@ -287,7 +511,7 @@ ParserObjectType = {
 	0,                         /* tp_descr_get */
 	0,                         /* tp_descr_set */
 	0,                         /* tp_dictoffset */
-	(initproc)ParserObject_init,/* tp_init */
+	(initproc) ParserObject_init,/* tp_init */
 	0,                         /* tp_alloc */
 	0,                         /* tp_new */
 };
@@ -308,6 +532,14 @@ PyMODINIT_FUNC initbinlog(void)
 		return;
 	Py_INCREF(&FormatDescriptionEventObjectType);
 	PyModule_AddObject(mod, "FormatDescriptionEvent", (PyObject *) &FormatDescriptionEventObjectType);
+
+	/* QueryEvent */
+	QueryEventObjectType.tp_new = PyType_GenericNew;
+	if (PyType_Ready(&QueryEventObjectType) < 0)
+		return;
+	Py_INCREF(&QueryEventObjectType);
+	PyModule_AddObject(mod, "QueryEvent", (PyObject *) &QueryEventObjectType);
+
 
 	EventObjectType.tp_new = PyType_GenericNew;
 	if (PyType_Ready(&EventObjectType) < 0)

@@ -28,7 +28,7 @@ struct event {
 };
 
 #define format_description_event_data(e) ((e)->data + ((struct format_description_event*) (e)->data)->header_len)
-#define format_description_event_data_len(e) (((struct format_description_event*)(e)->data)->header_len - EVENT_HEADER_SIZE)
+#define format_description_event_data_len(e) ((((struct formatdescription_event*) e)->data)->header_len - EVENT_HEADER_SIZE)
 struct format_description_event {
 	uint16_t	format_version;	/* ought to be 4 */
 	char		server_version[50];
@@ -37,9 +37,9 @@ struct format_description_event {
 	// random data
 };
 
-#define query_event_statement(e) (e->data + sizeof(struct query_event) + ((struct query_event*)e->data)->status_var_len + ((struct query_event*)e->data)->db_name_len + 1)
-#define query_event_statement_len(e) (e->length - EVENT_HEADER_SIZE - sizeof(struct query_event) - ((struct query_event*)e->data)->status_var_len - ((struct query_event*)e->data)->db_name_len - 1)
-#define query_event_db_name(e) (e->data + sizeof(struct query_event) + ((struct query_event*)e->data)->status_var_len)
+#define query_event_statement(e) ((e)->data + sizeof(struct query_event) + ((struct query_event*)(e)->data)->status_var_len + ((struct query_event*)(e)->data)->db_name_len + 1)
+#define query_event_statement_len(e) ((e)->length - EVENT_HEADER_SIZE - sizeof(struct query_event) - ((struct query_event*)(e)->data)->status_var_len - ((struct query_event*)(e)->data)->db_name_len - 1)
+#define query_event_db_name(e) ((e)->data + sizeof(struct query_event) + ((struct query_event*)(e)->data)->status_var_len)
 struct query_event {
 	uint32_t	thread_id;
 	uint32_t	query_time;
@@ -65,8 +65,8 @@ struct intvar_event {
 	uint64_t	value;
 };
 
-#define rotate_event_file_name(e) (e->data + 8)
-#define rotate_event_file_name_len(e) (e->length - EVENT_HEADER_SIZE -8)
+#define rotate_event_file_name(e) ((e)->data + 8)
+#define rotate_event_file_name_len(e) ((e)->length - EVENT_HEADER_SIZE - 8)
 struct rotate_event {
 	uint64_t	next_position;
 	// file name of the next file (not NUL)

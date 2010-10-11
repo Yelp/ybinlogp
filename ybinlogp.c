@@ -5,7 +5,10 @@
  */
 
 #define _XOPEN_SOURCE 600
+
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -179,7 +182,9 @@ void print_event(struct event *e) {
 			struct format_description_event *f = (struct format_description_event*)e->data;
 			printf("binlog version:     %d\n", f->format_version);
 			printf("server version:     %s\n", f->server_version);
+			/*
 			printf("variable length:    %d\n", format_description_event_data_len(e));
+			*/
 			}
 			break;
 		case 16:			/* XID_EVENT */

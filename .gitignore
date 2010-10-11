@@ -4,3 +4,4 @@ ybinlogp
 \#*#
 \.#*
 build/
+mysql-bin.[0-9]*
