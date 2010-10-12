@@ -509,7 +509,10 @@ ParserObject_next(ParserObject *self)
 		EventObject_init(self->event, NULL, NULL);
 		fprintf(stderr, "2");
 		offset = next_after(&ev->event);
-		read_event(fileno(PyFile_AsFile(self->file)), &(self->event->event), offset);
+		if (read_event_unsafe(fileno(PyFile_AsFile(self->file)), &(self->event->event), offset), 0) {
+			fprintf(stderr, "Got an error in read_event\n");
+			return -1;
+		}
 		fprintf(stderr, "3");
 
 		/* incref our event */
@@ -530,6 +533,8 @@ ParserObject_next(ParserObject *self)
 			self->event->data = (PyObject *) PyObject_New(QueryEventObject, &QueryEventObjectType);
 			QueryEventObject_init((QueryEventObject *) self->event->data, NULL, NULL);
 
+			assert(self->event->event.data != NULL);
+			fprintf(stderr, "self->event->event.data: %p\n", self->event->event.data);
 			memcpy(&((QueryEventObject *) self->event->data)->query, self->event->event.data, sizeof(struct query_event));
 
 			Py_DECREF(((QueryEventObject *) self->event->data)->db_name);
@@ -558,7 +563,7 @@ ParserObject_next(ParserObject *self)
 
 			break;
 
-		case 5: /* INTVAR EVENT */
+		case 5: /* INTVAR EVENT *
 			fprintf(stderr, "8");
 			Py_DECREF(self->event->data);
 			fprintf(stderr, "9\n");
@@ -571,7 +576,7 @@ ParserObject_next(ParserObject *self)
 			fprintf(stderr, "event.data.type = %d\n", ((struct intvar_event *) self->event->event.data)->type);
 			fprintf(stderr, "11, sizeof -> %zd\n", sizeof(struct intvar_event));
 			memcpy(&((IntvarEventObject *) self->event->data)->intvar, self->event->event.data, sizeof(struct intvar_event));
-			fprintf(stderr, "12\n");
+			fprintf(stderr, "12\n");*/
 			break;
 
 		default:

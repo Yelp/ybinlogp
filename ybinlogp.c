@@ -226,7 +226,7 @@ int check_event(struct event *e)
 	}
 }
 
-int read_event(int fd, struct event *evbuf, off64_t offset)
+int read_event_real(int fd, struct event *evbuf, off64_t offset, int do_check)
 {
 	ssize_t amt_read;
 	if ((lseek64(fd, offset, SEEK_SET) < 0)) {
@@ -242,7 +242,7 @@ int read_event(int fd, struct event *evbuf, off64_t offset)
 	} else if ((size_t)amt_read != EVENT_HEADER_SIZE) {
 		return -1;
 	}
-	if (check_event(evbuf)) {
+	if (!do_check || check_event(evbuf)) {
 #if DEBUG
 		fprintf(stdout, "mallocing %d bytes\n", evbuf->length - EVENT_HEADER_SIZE);
 #endif
@@ -257,8 +257,19 @@ int read_event(int fd, struct event *evbuf, off64_t offset)
 			perror("reading extra data:");
 			return -1;
 		}
+		return 0;
 	}
-	return 0;
+	return 1;
+}
+
+int read_event(int fd, struct event *evbuf, off64_t offset)
+{
+	return read_event_real(fd, evbuf, offset, 1);
+}
+
+int read_event_unsafe(int fd, struct event *evbuf, off64_t offset)
+{
+	return read_event_real(fd, evbuf, offset, 0);
 }
 
 void init_event(struct event *evbuf)

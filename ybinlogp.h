@@ -112,6 +112,15 @@ void print_event(struct event *e);
 int read_event(int, struct event *, off64_t);
 
 /**
+ * Read an event from the specified offset into the given event buffer.
+ *
+ * Will also malloc() space for any dynamic portions of the event.
+ *
+ * Does not check the validity of the record
+ **/
+int read_event_unsafe(int, struct event *, off64_t);
+
+/**
  * Check to see if an event looks valid.
  **/
 int check_event(struct event *);
