@@ -553,20 +553,26 @@ ParserObject_next(ParserObject *self)
 
 			break;
 
-		case 5: /* INTVAR EVENT 
+		case 5: /* INTVAR EVENT */
+			fprintf(stderr, "a\n");
 			Py_DECREF(self->event->data);
+			fprintf(stderr, "b\n");
 			self->event->data = (PyObject *) PyObject_New(IntvarEventObject, &IntvarEventObjectType);
+			fprintf(stderr, "c\n");
 			IntvarEventObject_init((IntvarEventObject *) self->event->data, NULL, NULL);
+			fprintf(stderr, "d\n");
+			fprintf(stderr, "%p\n", &((IntvarEventObject *) self->event->data)->intvar);
+			fprintf(stderr, "%p\n", self->event->event.data);
 			memcpy(&((IntvarEventObject *) self->event->data)->intvar, self->event->event.data, sizeof(struct intvar_event));
+			fprintf(stderr, "e\n");
 			break;
-				*/
 
 		default:
 			fprintf(stderr, "WTF? type_code is %d\n", self->event->event.type_code);
 			break;
 		}
 
-		//Py_DECREF(ev);
+		Py_DECREF(ev);
 		return (PyObject *) ev;
 	} else {
 		return NULL;
