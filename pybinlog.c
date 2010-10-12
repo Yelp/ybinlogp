@@ -497,44 +497,35 @@ ParserObject_next(ParserObject *self)
 	off64_t offset;
 	EventObject *ev;
 
-	fprintf(stderr, "fuck off\n");
-
 	if (self->event != NULL) {
 		/* read the last event */
 		ev = self->event;
 
 		/* get the next event, and store it privately as self->event */
-		fprintf(stderr, "1");
 		self->event = PyObject_New(EventObject, &EventObjectType);
 		EventObject_init(self->event, NULL, NULL);
-		fprintf(stderr, "2");
 		offset = next_after(&ev->event);
 		if (read_event_unsafe(fileno(PyFile_AsFile(self->file)), &(self->event->event), offset), 0) {
 			fprintf(stderr, "Got an error in read_event\n");
-			return -1;
+			return NULL;
 		}
-		fprintf(stderr, "3");
 
 		/* incref our event */
 		Py_INCREF(self->event);
-		fprintf(stderr, "4");
 
 		/* try to convert event->data into the right kind of object */
 		switch(self->event->event.type_code) {
 
 		case 0: /* log parsing has ended */
-			fprintf(stderr, "5");
 			Py_DECREF(self->event);
 			self->event = NULL;
 			break;
 		case 2: /* EVENT_QUERY */
-			fprintf(stderr, "6");
 			Py_DECREF(self->event->data);
 			self->event->data = (PyObject *) PyObject_New(QueryEventObject, &QueryEventObjectType);
 			QueryEventObject_init((QueryEventObject *) self->event->data, NULL, NULL);
 
 			assert(self->event->event.data != NULL);
-			fprintf(stderr, "self->event->event.data: %p\n", self->event->event.data);
 			memcpy(&((QueryEventObject *) self->event->data)->query, self->event->event.data, sizeof(struct query_event));
 
 			Py_DECREF(((QueryEventObject *) self->event->data)->db_name);
@@ -549,7 +540,6 @@ ParserObject_next(ParserObject *self)
 
 			break;
 		case 4: /* ROTATE EVENT */
-			fprintf(stderr, "7");
 			Py_DECREF(self->event->data);
 			self->event->data = (PyObject *) PyObject_New(RotateEventObject, &RotateEventObjectType);
 			RotateEventObject_init((RotateEventObject *) self->event->data, NULL, NULL);
@@ -563,32 +553,22 @@ ParserObject_next(ParserObject *self)
 
 			break;
 
-		case 5: /* INTVAR EVENT *
-			fprintf(stderr, "8");
+		case 5: /* INTVAR EVENT 
 			Py_DECREF(self->event->data);
-			fprintf(stderr, "9\n");
 			self->event->data = (PyObject *) PyObject_New(IntvarEventObject, &IntvarEventObjectType);
-			fprintf(stderr, "10\n");
 			IntvarEventObject_init((IntvarEventObject *) self->event->data, NULL, NULL);
-			fprintf(stderr, "11, self->event->data = %p\n", self->event->data);
-			fprintf(stderr, "11, self->event->data->intvar = %p\n", &((IntvarEventObject *) self->event->data)->intvar);
-			fprintf(stderr, "11, event.data = %p\n", self->event->event.data);
-			fprintf(stderr, "event.data.type = %d\n", ((struct intvar_event *) self->event->event.data)->type);
-			fprintf(stderr, "11, sizeof -> %zd\n", sizeof(struct intvar_event));
 			memcpy(&((IntvarEventObject *) self->event->data)->intvar, self->event->event.data, sizeof(struct intvar_event));
-			fprintf(stderr, "12\n");*/
 			break;
+				*/
 
 		default:
 			fprintf(stderr, "WTF? type_code is %d\n", self->event->event.type_code);
 			break;
 		}
 
-		fprintf(stderr, "fuck on, biatch\n");
 		//Py_DECREF(ev);
 		return (PyObject *) ev;
 	} else {
-		fprintf(stderr, "fuck on, biatch\n");
 		return NULL;
 	}
 }
