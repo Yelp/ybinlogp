@@ -27,7 +27,7 @@ static int
 FormatDescriptionEventObject_init(FormatDescriptionEventObject *self, PyObject *args, PyObject *kwds)
 {
 	memset(&self->fde, 0, sizeof(struct format_description_event));
-	return 1;
+	return 0;
 }
 
 static PyObject*
@@ -116,7 +116,7 @@ QueryEventObject_init(QueryEventObject *self, PyObject *args, PyObject *kwds)
 	self->query_text = Py_None;
 	Py_INCREF(Py_None);
 
-	return 1;
+	return 0;
 }
 
 static void
@@ -181,6 +181,81 @@ QueryEventObjectType = {
 };
 
 /***********
+ * INTVAR EVENTS
+ **********/
+
+typedef struct {
+	PyObject_HEAD
+	struct intvar_event intvar;
+} IntvarEventObject;
+
+static PyMemberDef
+IntvarEventObject_members[] = {
+	{"type", T_UBYTE, offsetof(IntvarEventObject, intvar) + offsetof(struct intvar_event, type), READONLY, "The intvar type"},
+	{"value", T_ULONGLONG, offsetof(IntvarEventObject, intvar) + offsetof(struct intvar_event, value), READONLY, "The intvar value"},
+	{NULL}
+};
+
+
+static int
+IntvarEventObject_init(IntvarEventObject *self, PyObject *args, PyObject *kwds)
+{
+	memset(&self->intvar, 0, sizeof(struct intvar_event));
+	return 0;
+}
+
+static PyObject*
+IntvarEventObject_repr(IntvarEventObject *self)
+{
+	return PyString_FromFormat("IntvarEvent(type=%u, value=%llu)",
+							   (unsigned int) self->intvar.type,
+							   (LLU_TYPE) self->intvar.value);
+}
+
+static PyTypeObject
+IntvarEventObjectType = {
+	PyObject_HEAD_INIT(NULL)
+	0,                               /* ob_size */
+	"IntvarEvent",                   /* tp_name */
+	sizeof(IntvarEventObject),       /* tp_basicsize */
+	0,                               /* tp_itemsize */
+	0,                               /* tp_dealloc */
+	0,                               /* tp_print */
+	0,                               /* tp_getattr */
+	0,                               /* tp_setattr */
+	0,                               /* tp_compare */
+	(reprfunc) IntvarEventObject_repr, /* tp_repr */
+	0,                               /* tp_as_number */
+	0,                               /* tp_as_sequence */
+	0,                               /* tp_as_mapping */
+	0,                               /* tp_hash */
+	0,                               /* tp_call */
+	0,                               /* tp_str */
+	0,                               /* tp_getattro */
+	0,                               /* tp_setattro */
+	0,                               /* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags*/
+	"MySQL intvar event",            /* tp_doc */
+	0,                               /* tp_traverse */
+	0,                               /* tp_clear */
+	0,                               /* tp_richcompare */
+	0,                               /* tp_weaklistoffset */
+	0,                               /* tp_iter */
+	0,                               /* tp_iternext */
+	0,                               /* tp_methods */
+	IntvarEventObject_members,       /* tp_members */
+	0,                               /* tp_getset */
+	0,                               /* tp_base */
+	0,                               /* tp_dict */
+	0,                               /* tp_descr_get */
+	0,                               /* tp_descr_set */
+	0,                               /* tp_dictoffset */
+	(initproc)IntvarEventObject_init, /* tp_init */
+	0,                               /* tp_alloc */
+	0,                               /* tp_new */
+};
+
+/***********
  * ROTATE EVENTS
  **********/
 
@@ -204,7 +279,7 @@ RotateEventObject_init(RotateEventObject *self, PyObject *args, PyObject *kwds)
 	memset(&self->rotate, 0, sizeof(struct rotate_event));
 	self->next_file = Py_None;
 	Py_INCREF(Py_None);
-	return 1;
+	return 0;
 }
 
 static void
@@ -290,7 +365,7 @@ EventObject_init(EventObject *self, PyObject *args, PyObject *kwds)
 	memset(&self->event, 0, sizeof(struct event));
 	self->data = Py_None;
 	Py_INCREF(self->data);
-	return 1;
+	return 0;
 }
 
 static void
@@ -307,7 +382,7 @@ EventObject_dealloc(EventObject *self)
 static PyObject*
 EventObject_repr(EventObject *self)
 {
-	return PyString_FromFormat("EventObject(type_code=%d, offset=%llu, server_id=%d, timestamp=%d, data=%s)",
+	return PyString_FromFormat("EventObject(type_code=%d, offset=%llu, server_id=%u, timestamp=%d, data=%s)",
 							   self->event.type_code,
 							   (LLU_TYPE) self->event.offset,
 							   self->event.server_id,
@@ -397,9 +472,9 @@ ParserObject_init(ParserObject *self, PyObject *args, PyObject *kwds)
 		/* XXX: can't access .server_version after this */
 		memcpy(&((FormatDescriptionEventObject *) self->event->data)->fde, self->event->event.data, sizeof(struct format_description_event));
 
-		return 1;
-	} else {
 		return 0;
+	} else {
+		return 1;
 	}
 }
 
@@ -417,31 +492,40 @@ ParserObject_iter(ParserObject *self)
 }
 
 static PyObject*
-ParserObject_next(ParserObject *self, PyObject *args, PyObject *kwds)
+ParserObject_next(ParserObject *self)
 {
 	off64_t offset;
 	EventObject *ev;
 
-	if ((PyObject *) self->event != NULL) {
-		ev = self->event;
-		//if (ev->data == NULL)
-		//ev->data = PyString_FromStringAndSize(ev->event.data, ev->event.length - 19);
+	fprintf(stderr, "fuck off\n");
 
+	if (self->event != NULL) {
+		/* read the last event */
+		ev = self->event;
+
+		/* get the next event, and store it privately as self->event */
+		fprintf(stderr, "1");
 		self->event = PyObject_New(EventObject, &EventObjectType);
 		EventObject_init(self->event, NULL, NULL);
-
+		fprintf(stderr, "2");
 		offset = next_after(&ev->event);
 		read_event(fileno(PyFile_AsFile(self->file)), &(self->event->event), offset);
+		fprintf(stderr, "3");
 
+		/* incref our event */
 		Py_INCREF(self->event);
+		fprintf(stderr, "4");
 
+		/* try to convert event->data into the right kind of object */
 		switch(self->event->event.type_code) {
 
 		case 0: /* log parsing has ended */
+			fprintf(stderr, "5");
 			Py_DECREF(self->event);
 			self->event = NULL;
 			break;
 		case 2: /* EVENT_QUERY */
+			fprintf(stderr, "6");
 			Py_DECREF(self->event->data);
 			self->event->data = (PyObject *) PyObject_New(QueryEventObject, &QueryEventObjectType);
 			QueryEventObject_init((QueryEventObject *) self->event->data, NULL, NULL);
@@ -460,6 +544,7 @@ ParserObject_next(ParserObject *self, PyObject *args, PyObject *kwds)
 
 			break;
 		case 4: /* ROTATE EVENT */
+			fprintf(stderr, "7");
 			Py_DECREF(self->event->data);
 			self->event->data = (PyObject *) PyObject_New(RotateEventObject, &RotateEventObjectType);
 			RotateEventObject_init((RotateEventObject *) self->event->data, NULL, NULL);
@@ -473,23 +558,42 @@ ParserObject_next(ParserObject *self, PyObject *args, PyObject *kwds)
 
 			break;
 
+		case 5: /* INTVAR EVENT */
+			fprintf(stderr, "8");
+			Py_DECREF(self->event->data);
+			fprintf(stderr, "9\n");
+			self->event->data = (PyObject *) PyObject_New(IntvarEventObject, &IntvarEventObjectType);
+			fprintf(stderr, "10\n");
+			IntvarEventObject_init((IntvarEventObject *) self->event->data, NULL, NULL);
+			fprintf(stderr, "11, self->event->data = %p\n", self->event->data);
+			fprintf(stderr, "11, self->event->data->intvar = %p\n", &((IntvarEventObject *) self->event->data)->intvar);
+			fprintf(stderr, "11, event.data = %p\n", self->event->event.data);
+			fprintf(stderr, "event.data.type = %d\n", ((struct intvar_event *) self->event->event.data)->type);
+			fprintf(stderr, "11, sizeof -> %zd\n", sizeof(struct intvar_event));
+			memcpy(&((IntvarEventObject *) self->event->data)->intvar, self->event->event.data, sizeof(struct intvar_event));
+			fprintf(stderr, "12\n");
+			break;
+
 		default:
-			//fprintf(stderr, "type_code is %d\n", self->event->event.type_code);
+			fprintf(stderr, "WTF? type_code is %d\n", self->event->event.type_code);
 			break;
 		}
 
+		fprintf(stderr, "fuck on, biatch\n");
 		//Py_DECREF(ev);
 		return (PyObject *) ev;
 	} else {
+		fprintf(stderr, "fuck on, biatch\n");
 		return NULL;
 	}
 }
 
+/*
 static PyMethodDef
 ParserObject_methods[] = {
-    {"next", (PyCFunction) ParserObject_next, METH_VARARGS, "iterate through the binlog" },
-    {NULL, NULL, 0, NULL} /* Sentinel */
+    {NULL, NULL, 0, NULL} 
 };
+*/
 
 
 
@@ -523,7 +627,7 @@ ParserObjectType = {
 	0,                         /* tp_weaklistoffset */
 	(getiterfunc) ParserObject_iter, /* tp_iter */
 	(iternextfunc) ParserObject_next, /* tp_iternext */
-	ParserObject_methods,      /* tp_methods */
+	0,      /* tp_methods */
 	ParserObject_members,      /* tp_members */
 	0,                         /* tp_getset */
 	0,                         /* tp_base */
@@ -560,6 +664,19 @@ PyMODINIT_FUNC initbinlog(void)
 	Py_INCREF(&QueryEventObjectType);
 	PyModule_AddObject(mod, "QueryEvent", (PyObject *) &QueryEventObjectType);
 
+	/* IntvarEvent */
+	IntvarEventObjectType.tp_new = PyType_GenericNew;
+	if (PyType_Ready(&IntvarEventObjectType) < 0)
+		return;
+	Py_INCREF(&IntvarEventObjectType);
+	PyModule_AddObject(mod, "IntvarEvent", (PyObject *) &IntvarEventObjectType);
+
+	/* RotateEvent */
+	RotateEventObjectType.tp_new = PyType_GenericNew;
+	if (PyType_Ready(&RotateEventObjectType) < 0)
+		return;
+	Py_INCREF(&RotateEventObjectType);
+	PyModule_AddObject(mod, "RotateEvent", (PyObject *) &RotateEventObjectType);
 
 	EventObjectType.tp_new = PyType_GenericNew;
 	if (PyType_Ready(&EventObjectType) < 0)

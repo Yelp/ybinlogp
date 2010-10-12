@@ -1,8 +1,6 @@
+import sys
 import binlog
-import datetime
 
-file = open('mysql-bin.000001')
-parser = binlog.BinlogParser(file)
-
-for event in parser:
+binlog_file = open(sys.argv[1])
+for event in binlog.BinlogParser(binlog_file):
 	print event
