@@ -307,7 +307,12 @@ EventObject_dealloc(EventObject *self)
 static PyObject*
 EventObject_repr(EventObject *self)
 {
-	return PyString_FromFormat("EventObject(data=%s)", PyString_AsString(PyObject_Repr(self->data)));
+	return PyString_FromFormat("EventObject(type_code=%d, offset=%llu, server_id=%d, timestamp=%d, data=%s)",
+							   self->event.type_code,
+							   (LLU_TYPE) self->event.offset,
+							   self->event.server_id,
+							   self->event.timestamp,
+							   PyString_AsString(PyObject_Repr(self->data)));
 }
 
 static PyTypeObject
