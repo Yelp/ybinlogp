@@ -487,10 +487,12 @@ int main(int argc, char **argv)
 			case '?':
 				fprintf(stderr, "Unknown argument %c\n", optopt);
 				usage();
+				free(evbuf);
 				return 1;
 				break;
 			default:
 				usage();
+				free(evbuf);
 				return 1;
 		}
 	}
