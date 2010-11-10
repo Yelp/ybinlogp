@@ -2,6 +2,9 @@
  * ybinlogp: A mysql binary log parser and query tool
  *
  * (C) 2010 Yelp, Inc.
+ *
+ * This work is licensed under the ISC/OpenBSD License. The full
+ * contents of that license can be found under license.txt
  */
 
 #define _XOPEN_SOURCE 600

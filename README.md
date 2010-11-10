@@ -35,3 +35,8 @@ Eskil Olsen <eskil@yelp.com> has a branch that does some crazy stuff with Boost.
 Contributing
 -----------
 It's Github... Fork away!
+
+License
+-------
+This work is available under the ISC (OpenBSD) license. The full contents are available
+as license.txt
