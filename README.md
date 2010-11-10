@@ -9,11 +9,12 @@ Usage
 ybinlogp [options] binlog-file
 
 Options:
- * `-o OFFSET          Find events after a given offset`
- * `-t TIME            Find events after a given unix timestamp`
- * `-a NUMBER          Print N events after the given one (accepts 'all')`
- * `-q                 Be slightly quieter`
- * `-Q                 Be much quieter`
+
+ *  `-o OFFSET          Find events after a given offset`
+ *  `-t TIME            Find events after a given unix timestamp`
+ *  `-a NUMBER          Print N events after the given one (accepts 'all')`
+ *  `-q                 Be slightly quieter`
+ *  `-Q                 Be much quieter`
 
 Why?
 ----
