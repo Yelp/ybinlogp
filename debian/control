@@ -1,0 +1,15 @@
+Source: ybinlogp
+Section: database
+Priority: extra
+Maintainer: James Brown <jbrown@yelp.com>
+Build-Depends: debhelper (>= 7)
+Standards-Version: 3.8.3
+Homepage: http://github.com/Yelp/ybinlogp
+
+Package: ybinlogp
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: A fast MySQL binlog parser in C
+ ybinlogp is a utility for analyzing mysql binlogs. It currently
+ has a command-line interface for searching and printing binlogs.
+ There might be Python bindings at some point in the future
