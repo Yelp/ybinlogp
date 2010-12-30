@@ -102,6 +102,11 @@ int copy_event(struct event *, struct event *);
 void dispose_event(struct event *);
 
 /**
+ * Print out only statement events, and only the statement
+ **/
+void print_statement_event(struct event *e);
+
+/**
  * Print out an event
  **/
 void print_event(struct event *e);

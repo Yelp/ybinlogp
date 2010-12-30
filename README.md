@@ -13,8 +13,13 @@ Options:
  *  `-o OFFSET          Find events after a given offset`
  *  `-t TIME            Find events after a given unix timestamp`
  *  `-a NUMBER          Print N events after the given one (accepts 'all')`
- *  `-q                 Be slightly quieter`
- *  `-Q                 Be much quieter`
+ *  `-Q                 Only print query statements`
+ *  `-QQ                Only print query statements, without transaction indicators`
+ *  `-D DBNAME          Filter out query statements not on database DBNAME`
+ *  `-h                 Show help`
+ *  `-q                 Be quieter (may be specified multiple times)`
+ *  `-v                 Be more verbose`
+
 
 Why?
 ----
@@ -28,9 +33,9 @@ you actually know what the offset of an event is?)
 Who?
 ----
 **ybinlogp** was developed by some engineers at [Yelp](http://www.yelp.com) for use
-with their MySQL installation. The initial development was done by James Brown <jbrown@yelp.com>;
-Evan Klitzke <evan@yelp.com> worked on some bugfixes and a partially-complete Python API, and
-Eskil Olsen <eskil@yelp.com> has a branch that does some crazy stuff with Boost.
+with their MySQL installation. The initial development was done by James Brown (<jbrown@yelp.com>);
+Evan Klitzke (<evan@yelp.com>) worked on some bugfixes and a partially-complete Python API, and
+Eskil Olsen (<eskil@yelp.com>) has a branch that does some crazy stuff with Boost.
 
 Contributing
 -----------
