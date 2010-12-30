@@ -150,7 +150,7 @@ void print_event(struct event *e) {
 			printf("status var length:  %d\n", q->status_var_len);
 			printf("db_name:            %s\n", db_name);
 			printf("statement length:   %zd\n", statement_len);
-			if (q_mode > 0)
+			if (q_mode == 0)
 				printf("statement:          %s\n", statement);
 			free(statement);
 			}
