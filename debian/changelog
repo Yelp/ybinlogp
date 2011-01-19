@@ -1,0 +1,11 @@
+ybinlogp (0.2-yelp1) unstable; urgency=low
+
+  * Upstream release 0.2
+
+ -- James Brown <jbrown@yelp.com>  Wed, 29 Dec 2010 20:55:10 -0800
+
+ybinlogp (0.1-yelp1) unstable; urgency=low
+
+  * Initial release
+
+ -- James Brown <jbrown@yelp.com>  Mon, 06 Dec 2010 18:39:08 -0800

@@ -2,6 +2,9 @@
  * binlogp: A mysql binary log parser and query tool
  *
  * (C) 2010 Yelp, Inc.
+ *
+ * This work is licensed under the ISC/OpenBSD License. The full
+ * contents of that license can be found under license.txt
  */
 
 #ifndef _YBINLOGP_H_
@@ -97,6 +100,11 @@ int copy_event(struct event *, struct event *);
  * Destroy an event object and any associated data
  **/
 void dispose_event(struct event *);
+
+/**
+ * Print out only statement events, and only the statement
+ **/
+void print_statement_event(struct event *e);
 
 /**
  * Print out an event

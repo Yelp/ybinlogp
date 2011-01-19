@@ -1,14 +1,17 @@
 SOURCES := $(wildcard *.c *.h)
 TARGETS := ybinlogp
 
-CFLAGS=-Wall -ggdb -Wextra
+prefix := /usr
+
+CFLAGS += -Wall -ggdb -Wextra --std=c99
 #CFLAGS=-Wall -ggdb -Wextra -DDEBUG
 
 all: $(TARGETS)
 
 ybinlogp: ybinlogp.o
 
-force:: clean all
+#install: all
+#	install -m 755 -o root -g root ybinlogp $(prefix)/sbin/ybinlogp
 
 clean::
 	rm -f $(TARGETS) *.o
