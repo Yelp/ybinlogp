@@ -31,7 +31,7 @@ struct event {
 };
 
 #define format_description_event_data(e) ((e)->data + ((struct format_description_event*) (e)->data)->header_len)
-#define format_description_event_data_len(e) ((((struct formatdescription_event*) e)->data)->header_len - EVENT_HEADER_SIZE)
+#define format_description_event_data_len(e) (((struct format_description_event*) (e)->data)->header_len - EVENT_HEADER_SIZE)
 struct format_description_event {
 	uint16_t	format_version;	/* ought to be 4 */
 	char		server_version[50];

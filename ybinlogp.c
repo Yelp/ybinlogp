@@ -261,7 +261,7 @@ void print_event(struct event *e)
 			struct format_description_event *f = (struct format_description_event*)e->data;
 			printf("binlog version:	 %d\n", f->format_version);
 			printf("server version:	 %s\n", f->server_version);
-			printf("variable length:	%d\n", format_description_event_data_len(e));
+			printf("variable length: %d\n", format_description_event_data_len(e));
 			}
 			break;
 		case XID_EVENT:
