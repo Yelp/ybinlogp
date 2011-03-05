@@ -2,6 +2,9 @@
  * ybinlogp: A mysql binary log parser and query tool
  *
  * (C) 2010 Yelp, Inc.
+ *
+ * This work is licensed under the ISC/OpenBSD License. The full
+ * contents of that license can be found under license.txt
  */
 
 #define _XOPEN_SOURCE 600
@@ -14,6 +17,7 @@
 #include <errno.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 #include <assert.h>
 
 #include "ybinlogp.h"
@@ -67,6 +71,36 @@ char* event_types[27] = {
 	"HEARTBEAT_LOG_EVENT"			// 26
 };
 
+enum e_event_types {
+	UNKNOWN_EVENT=0,
+	START_EVENT_V3=1,
+	QUERY_EVENT=2,
+	STOP_EVENT=3,
+	ROTATE_EVENT=4,
+	INTVAR_EVENT=5,
+	LOAD_EVENT=6,
+	SLAVE_EVENT=7,
+	CREATE_FILE_EVENT=8,
+	APPEND_BLOCK_EVENT=9,
+	EXEC_LOAD_EVENT=10,
+	DELETE_FILE_EVENT=11,
+	NEW_LOAD_EVENT=12,
+	RAND_EVENT=13,
+	USER_VAR_EVENT=14,
+	FORMAT_DESCRIPTION_EVENT=15,
+	XID_EVENT=16,
+	BEGIN_LOAD_QUERY_EVENT=17,
+	EXECUTE_LOAD_QUERY_EVENT=18,
+	TABLE_MAP_EVENT=19,
+	PRE_GA_WRITE_ROWS_EVENT=20,
+	PRE_GA_DELETE_ROWS_EVENT=21,
+	WRITE_ROWS_EVENT=22,
+	UPDATE_ROWS_EVENT=23,
+	DELETE_ROWS_EVENT=24,
+	INCIDENT_EVENT=25,
+	HEARTBEAT_LOG_EVENT=26
+};
+
 char* variable_types[10] = {
 	"Q_FLAGS2_CODE",			// 0
 	"Q_SQL_MODE_CODE",			// 1
@@ -99,21 +133,65 @@ char* flags[16] = {
 };
 
 int q_mode = 0;
+int v_mode = 0;
+int Q_mode = 0;
 struct stat stbuf;
+char* database_limit = NULL;
 
-void print_event(struct event *e) {
+void print_statement_event(struct event *e)
+{
+	if (e-> data == NULL) {
+		return;
+	}
+	switch ((enum e_event_types)e->type_code) {
+		case QUERY_EVENT:
+			{
+			size_t statement_len = query_event_statement_len(e);
+			char* db_name = query_event_db_name(e);
+			/* Duplicate the statement because the binlog
+			 * doesn't NUL-terminate it. */
+			char *statement;
+            if ((database_limit != NULL) && (strncmp(db_name, database_limit, strlen(database_limit)) != 0))
+                return;
+			if ((statement = strndup((const char*)query_event_statement(e), statement_len)) == NULL) {
+				perror("strndup");
+				return;
+			}
+			if ((Q_mode <= 1) || (strncmp(statement, "BEGIN", 5) != 0)) {
+				printf("%s;\n", statement);
+			}
+			free(statement);
+			break;
+			}
+		case XID_EVENT:
+			{
+			if (Q_mode <= 1)
+				printf("COMMIT\n");
+			break;
+			}
+		default:
+			break;
+	}
+}
+
+void print_event(struct event *e)
+{
 	int i;
 	const time_t t = e->timestamp;
+	if (Q_mode) {
+		return print_statement_event(e);
+    }
 	printf("BYTE OFFSET %llu\n", (long long)e->offset);
 	printf("------------------------\n");
-	printf("timestamp:          %d = %s", e->timestamp, ctime(&t));
-	printf("type_code:          %s\n", event_types[e->type_code]);
+	printf("timestamp:		  %d = %s", e->timestamp, ctime(&t));
+	printf("type_code:		  %s\n", event_types[e->type_code]);
 	if (q_mode > 1)
 		return;
-	printf("server id:          %u\n", e->server_id);
-	printf("length:             %d\n", e->length);
-	printf("next pos:           %llu\n", (unsigned long long)e->next_position);
-	printf("flags:              ");
+	printf("server id:		  %u\n", e->server_id);
+	if (v_mode)
+		printf("length:			 %d\n", e->length);
+		printf("next pos:		   %llu\n", (unsigned long long)e->next_position);
+	printf("flags:			  ");
 	for(i=16; i > 0; --i)
 	{
 		printf("%hhd", GET_BIT(e->flags, i));
@@ -122,13 +200,13 @@ void print_event(struct event *e) {
 	for(i=16; i > 0; --i)
 	{
 		if (GET_BIT(e->flags, i))
-			printf("                        %s\n", flags[i-1]);
+			printf("						%s\n", flags[i-1]);
 	}
 	if (e->data == NULL) {
 		return;
 	}
-	switch (e->type_code) {
-		case 2:				/* QUERY_EVENT */
+	switch ((enum e_event_types)e->type_code) {
+		case QUERY_EVENT:
 			{
 			struct query_event *q = (struct query_event*)e->data;
 			char* db_name = query_event_db_name(e);
@@ -136,81 +214,91 @@ void print_event(struct event *e) {
 			/* Duplicate the statement because the binlog
 			 * doesn't NUL-terminate it. */
 			char* statement;
+            if ((database_limit != NULL) && (strncmp(db_name, database_limit, strlen(database_limit)) != 0))
+                return;
 			if ((statement = strndup((const char*)query_event_statement(e), statement_len)) == NULL) {
 				perror("strndup");
 				return;
 			}
-			printf("thread id:          %d\n", q->thread_id);
-			printf("query time (s):     %d\n", q->query_time);
+			printf("thread id:		  %d\n", q->thread_id);
+			printf("query time (s):	 %d\n", q->query_time);
 			if (q->error_code == 0) {
-				printf("error code:         %d\n", q->error_code);
+				printf("error code:		 %d\n", q->error_code);
 			}
 			else {
-				printf("ERROR CODE:         %d\n", q->error_code);
+				printf("ERROR CODE:		 %d\n", q->error_code);
 			}
 			printf("status var length:  %d\n", q->status_var_len);
-			printf("db_name:            %s\n", db_name);
+			printf("db_name:			%s\n", db_name);
 			printf("statement length:   %zd\n", statement_len);
-			if (q_mode > 0)
-				printf("statement:          %s\n", statement);
+			if (q_mode == 0)
+				printf("statement:		  %s\n", statement);
 			free(statement);
 			}
 			break;
-		case 4:
+		case ROTATE_EVENT:
 			{
 			struct rotate_event *r = (struct rotate_event*)e->data;
 			char *file_name = strndup((const char*)rotate_event_file_name(e), rotate_event_file_name_len(e));
 			printf("next log position:  %llu\n", (unsigned long long)r->next_position);
-			printf("next file name:     %s\n", file_name);
+			printf("next file name:	 %s\n", file_name);
 			free(file_name);
 			}
 			break;
-		case 5:
+		case INTVAR_EVENT:
 			{
 			struct intvar_event *i = (struct intvar_event*)e->data;
-			printf("variable type:      %s\n", intvar_types[i->type]);
-			printf("value: 	            %llu\n", (unsigned long long) i->value);
+			printf("variable type:	  %s\n", intvar_types[i->type]);
+			printf("value: 				%llu\n", (unsigned long long) i->value);
 			}
 			break;
-		case 13:
+		case RAND_EVENT:
 			{
 			struct rand_event *r = (struct rand_event*)e->data;
-			printf("seed 1:	            %llu\n", (unsigned long long) r->seed_1);
-			printf("seed 2:	            %llu\n", (unsigned long long) r->seed_2);
+			printf("seed 1:				%llu\n", (unsigned long long) r->seed_1);
+			printf("seed 2:				%llu\n", (unsigned long long) r->seed_2);
 			}
 			break;
-		case 15:			/* FORMAT_DESCRIPTION_EVENT */
+		case FORMAT_DESCRIPTION_EVENT:
 			{
 			struct format_description_event *f = (struct format_description_event*)e->data;
-			printf("binlog version:     %d\n", f->format_version);
-			printf("server version:     %s\n", f->server_version);
-			printf("variable length:    %d\n", format_description_event_data_len(e));
+			printf("binlog version:	 %d\n", f->format_version);
+			printf("server version:	 %s\n", f->server_version);
+			printf("variable length:	%d\n", format_description_event_data_len(e));
 			}
 			break;
-		case 16:			/* XID_EVENT */
+		case XID_EVENT:
 			{
 			struct xid_event *x = (struct xid_event*)e->data;
-			printf("xid id:             %llu\n", (unsigned long long)x->id);
+			printf("xid id:			 %llu\n", (unsigned long long)x->id);
 			}
+			break;
+		default:
 			break;
 	}
 }
 
-void usage()
+void usage(void)
 {
-	fprintf(stderr, "Usage: ybinlogp [mode] logfile [mode-args]\n");
+	fprintf(stderr, "Usage: ybinlogp [mode] logfile\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "ybinlogp supports several different modes:\n");
-	fprintf(stderr, "\t-o Find the first event after the given offset\n");
-	fprintf(stderr, "\t\tybinlogp -o offset logfile\n");
-	fprintf(stderr, "\t-t Find the event closest to the given unix time\n");
-	fprintf(stderr, "\t\tybinlogp -t timestamp logfile\n");
-	fprintf(stderr, "\t-a When used with one of the above, print N items after the first one\n");
-	fprintf(stderr, "\t\tAccepts either an integer or the text 'all'\n");
-	fprintf(stderr, "\t\tybinlogp -a N -t timestamp logfile\n");
-	fprintf(stderr, "\t-q Be slightly quieter when printing (don't print statement contents\n");
-	fprintf(stderr, "\t-Q Be much quieter (only print offset, timestamp, and type code)\n");
+	fprintf(stderr, "\t-o OFFSET\t\tFind the first event after the given offset\n");
+	fprintf(stderr, "\t\t\t\tybinlogp -o offset logfile\n");
+	fprintf(stderr, "\t-t TIMESTAMP\t\tFind the event closest to the given unix time\n");
+	fprintf(stderr, "\t\t\t\tybinlogp -t timestamp logfile\n");
+	fprintf(stderr, "\t-a COUNT\t\tWhen used with one of the above, print COUNT items after the first one\n");
+	fprintf(stderr, "\t\t\t\tAccepts either an integer or the text 'all'\n");
+	fprintf(stderr, "\t\t\t\tybinlogp -a N -t timestamp logfile\n");
+	fprintf(stderr, "\t-q\t\t\tBe quieter (may be specified more than once)\n");
+	fprintf(stderr, "\t-Q\t\t\tOnly print QUERY_EVENTS, and only print the statement\n");
+	fprintf(stderr, "\t\t\t\tIf passed twice, do not print transaction events\n");
+	fprintf(stderr, "\t-D DBNAME\t\tFilter query events that were not in DBNAME\n");
+    fprintf(stderr, "\t\t\t\tNote that this still shows transaction control events\n");
+    fprintf(stderr, "\t\t\t\tsince those do not have an associated database. Mea culpa.\n");
+	fprintf(stderr, "\t-v\t\t\tBe more verbose (may be specified more than once)\n");
 	fprintf(stderr, "\t-S Remove server-id checks (by default, will only allow 1 slave and 1 master server-id in a log file\n");
+    fprintf(stderr, "\t-h\t\t\tShow this help\n");
 }
 
 int check_event(struct event *e)
@@ -238,7 +326,7 @@ int read_event(int fd, struct event *evbuf, off64_t offset)
 	}
 	amt_read = read(fd, (void*)evbuf, EVENT_HEADER_SIZE);
 	evbuf->offset = offset;
-	evbuf->data = 0;
+	evbuf->data = NULL;
 	if (amt_read < 0) {
 		fprintf(stderr, "Error reading event at %lld: %s\n", (long long) offset, strerror(errno));
 		return -1;
@@ -476,7 +564,7 @@ int main(int argc, char **argv)
 	MAX_TIMESTAMP = time(NULL);
 
 	/* Parse args */
-	while ((opt = getopt(argc, argv, "t:o:a:qQS")) != -1) {
+	while ((opt = getopt(argc, argv, "ht:o:a:qQvDS:")) != -1) {
 		switch (opt) {
 			case 't':		/* Time mode */
 				target_time = atol(optarg);
@@ -498,28 +586,43 @@ int main(int argc, char **argv)
 				if (num_to_show < 1)
 					num_to_show = 1;
 				break;
+			case 'v':
+				v_mode++;
+				break;
 			case 'q':
-				q_mode = 1;
+				q_mode++;
 				break;
 			case 'Q':
-				q_mode = 2;
+				Q_mode++;
 				break;
 			case 'S':
 				ENFORCE_SERVER_ID = 0;
 				break;
+            case 'h':
+                usage();
+                return 0;
 			case '?':
 				fprintf(stderr, "Unknown argument %c\n", optopt);
 				usage();
+				free(evbuf);
 				return 1;
+				break;
+			case 'D':
+				database_limit = strdup(optarg);
 				break;
 			default:
 				usage();
+				free(evbuf);
 				return 1;
 		}
 	}
+	if (v_mode && q_mode) {
+		fprintf(stderr, "-v and -q/-Q may not be specified\n");
+		return 2;
+	}
 	if (optind >= argc) {
 		usage();
-		return 1;
+		return 2;
 	}
 	/* First argument is always filename */
 	if (stat(argv[optind], &stbuf)) {
@@ -551,8 +654,9 @@ int main(int argc, char **argv)
 	}
 	else {
 		print_event(evbuf);
-		while ((shown < num_to_show) && (offset > 0) && (evbuf->next_position != evbuf->offset) &&
-				(evbuf->next_position != 0)) {
+		while ((shown < num_to_show) && (offset > 0) &&
+				(evbuf->next_position != evbuf->offset) &&
+				(evbuf->next_position < stbuf.st_size)) {
 			/* 
 			 * When we're in a_mode, just use the built-in
 			 * chaining to be BLAZINGLY FASTish
@@ -561,7 +665,8 @@ int main(int argc, char **argv)
 			reset_event(evbuf);
 			read_event(fd, evbuf, offset);
 			if (offset > 0) {
-				printf("\n");
+				if (!Q_mode)
+					printf("\n");
 				print_event(evbuf);
 			}
 			if (!show_all)

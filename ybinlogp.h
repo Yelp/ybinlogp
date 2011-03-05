@@ -2,14 +2,18 @@
  * binlogp: A mysql binary log parser and query tool
  *
  * (C) 2010 Yelp, Inc.
+ *
+ * This work is licensed under the ISC/OpenBSD License. The full
+ * contents of that license can be found under license.txt
  */
 
-#include <unistd.h>
-#include <sys/types.h>
+#ifndef _YBINLOGP_H_
+#define _YBINLOGP_H_
+
 #include <stdint.h>
+#include <sys/types.h>
 
 #define BINLOG_VERSION 4
-
 
 #define EVENT_HEADER_SIZE 19	/* we tack on extra stuff at the end */
 
@@ -95,7 +99,12 @@ int copy_event(struct event *, struct event *);
 /**
  * Destroy an event object and any associated data
  **/
-void dipose_event(struct event *);
+void dispose_event(struct event *);
+
+/**
+ * Print out only statement events, and only the statement
+ **/
+void print_statement_event(struct event *e);
 
 /**
  * Print out an event
@@ -115,3 +124,16 @@ int read_event(int, struct event *, off64_t);
  **/
 int check_event(struct event *);
 
+/**
+ * Find the offset of the next event after the one passed in.
+ * Uses the built-in event chaining.
+ *
+ * Usage:
+ *  struct event *next;
+ *  struct event *evbuf = ...
+ *  off_t next_offset = next_after(evbuf);
+ *  read_event(fd, next, next_offset);
+ **/
+off64_t next_after(struct event *evbuf);
+
+#endif /* _YBINLOGP_H_ */
