@@ -160,15 +160,17 @@ char* flags2[32] = {
 
 /* Map of the lengths of status var data.
  * -1 indicates variable (the first byte is a length byte)
+ *  -2 indicates variable + 1 (the first byte is a length byte that is
+ *  wrong)
  */
 int status_var_data_len_by_type[10] = {
 	4, // 0 = Q_FLAGS2_CODE
 	8, // 1 = Q_SQL_MODE_CODE
-	-1,// 2 = Q_CATALOG_CODE (length byte + string + NUL)
+	-2,// 2 = Q_CATALOG_CODE (length byte + string + NUL)
 	4, // 3 = Q_AUTO_INCREMENT (2 2-byte ints)
 	6, // 4 = Q_CHARSET_CODE (3 2-byte ints)
-	-1,// 5 = Q_TIME_ZONE_CODE (length byte + string + NUL)
-	-1,// 6 = Q_CATALOG_NZ_CODE (length byte + string + NUL)
+	-1,// 5 = Q_TIME_ZONE_CODE (length byte + string)
+	-1,// 6 = Q_CATALOG_NZ_CODE (length byte + string)
 	2, // 7 = Q_LC_TIME_NAMES_COE
 	2, // 8 = Q_CHARSET_DATABASE_CODE
 	8, // 9 = Q_TABLE_MAP_FOR_UPDATE_COE
@@ -296,7 +298,7 @@ void print_event(struct event *e)
 			else {
 				printf("ERROR CODE:		 %d\n", q->error_code);
 			}
-			if (v_mode)
+			if (v_mode) {
 				printf("status var length:  %d\n", q->status_var_len);
 			}
 			printf("db_name:            %s\n", db_name);
@@ -396,8 +398,20 @@ void print_event(struct event *e)
 						default:
 							{
 							int incr = status_var_data_len_by_type[status_var_type];
-							assert(incr >= 0);
-							status_var_ptr += incr;
+							if (incr > 0) {
+								status_var_ptr += incr;
+							}
+							else if (incr == -1) {
+								uint8_t size = *status_var_ptr;
+								status_var_ptr += size + 1;
+							}
+							else if (incr == -2) {
+								uint8_t size = *status_var_ptr;
+								status_var_ptr += size + 2;
+							}
+							else {
+								assert(0);
+							}
 							printf("	                    %s\n", status_var_types[status_var_type]);
 							break;
 							}
