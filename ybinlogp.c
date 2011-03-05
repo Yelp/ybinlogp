@@ -426,9 +426,7 @@ void print_event(struct event *e)
 					}
 				}
 			}
-			if (v_mode || q_mode) {
-				printf("statement length:   %zd\n", statement_len);
-			}
+			printf("statement length:   %zd\n", statement_len);
 			if (q_mode == 0)
 				printf("statement:          %s\n", statement);
 			free(statement);
