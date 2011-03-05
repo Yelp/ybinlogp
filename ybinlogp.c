@@ -296,7 +296,9 @@ void print_event(struct event *e)
 			else {
 				printf("ERROR CODE:		 %d\n", q->error_code);
 			}
-			printf("status var length:  %d\n", q->status_var_len);
+			if (v_mode)
+				printf("status var length:  %d\n", q->status_var_len);
+			}
 			printf("db_name:            %s\n", db_name);
 			if (q->status_var_len > 0) {
 				char* status_var_start = query_event_status_vars(e);
