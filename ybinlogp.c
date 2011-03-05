@@ -30,94 +30,73 @@
 #define GET_BIT(x,bit) (!!(x & 1 << (bit-1)))
 
 /* binlog parameters */
-#define MIN_TYPE_CODE 0
-#define MAX_TYPE_CODE 27
 #define MIN_EVENT_LENGTH 19
 #define MAX_EVENT_LENGTH 10485760		/* Can't see why you'd have events >10MB. */
 time_t MIN_TIMESTAMP;				/* set to the time in the FDE */
 time_t MAX_TIMESTAMP;				/* Set this time(NULL) on startup */
 
 
-char* event_types[27] = {
-	"UNKNOWN_EVENT",			// 0
-	"START_EVENT_V3",			// 1
-	"QUERY_EVENT",				// 2
-	"STOP_EVENT",				// 3
-	"ROTATE_EVENT",				// 4
-	"INTVAR_EVENT",				// 5
-	"LOAD_EVENT",				// 6
-	"SLAVE_EVENT",				// 7
-	"CREATE_FILE_EVENT",			// 8
-	"APPEND_BLOCK_EVENT",			// 9
-	"EXEC_LOAD_EVENT",			// 10
-	"DELETE_FILE_EVENT",			// 11
-	"NEW_LOAD_EVENT",			// 12
-	"RAND_EVENT",				// 13
-	"USER_VAR_EVENT",			// 14
-	"FORMAT_DESCRIPTION_EVENT",		// 15
-	"XID_EVENT",				// 16
-	"BEGIN_LOAD_QUERY_EVENT",		// 17
-	"EXECUTE_LOAD_QUERY_EVENT",		// 18
-	"TABLE_MAP_EVENT",			// 19
-	"PRE_GA_WRITE_ROWS_EVENT",		// 20
-	"PRE_GA_DELETE_ROWS_EVENT",		// 21
-	"WRITE_ROWS_EVENT",			// 22
-	"UPDATE_ROWS_EVENT",			// 23
-	"DELETE_ROWS_EVENT",			// 24
-	"INCIDENT_EVENT",			// 25
-	"HEARTBEAT_LOG_EVENT"			// 26
+char* _event_types[NUM_EVENT_TYPES] = {
+    "UNKNOWN_EVENT",             // 0
+    "START_EVENT_V3",            // 1
+    "QUERY_EVENT",               // 2
+    "STOP_EVENT",                // 3
+    "ROTATE_EVENT",              // 4
+    "INTVAR_EVENT",              // 5
+    "LOAD_EVENT",                // 6
+    "SLAVE_EVENT",               // 7
+    "CREATE_FILE_EVENT",         // 8
+    "APPEND_BLOCK_EVENT",        // 9
+    "EXEC_LOAD_EVENT",           // 10
+    "DELETE_FILE_EVENT",         // 11
+    "NEW_LOAD_EVENT",            // 12
+    "RAND_EVENT",                // 13
+    "USER_VAR_EVENT",            // 14
+    "FORMAT_DESCRIPTION_EVENT",  // 15
+    "XID_EVENT",                 // 16
+    "BEGIN_LOAD_QUERY_EVENT",    // 17
+    "EXECUTE_LOAD_QUERY_EVENT",  // 18
+    "TABLE_MAP_EVENT",           // 19
+    "PRE_GA_WRITE_ROWS_EVENT",   // 20
+    "PRE_GA_DELETE_ROWS_EVENT",  // 21
+    "WRITE_ROWS_EVENT",          // 22
+    "UPDATE_ROWS_EVENT",         // 23
+    "DELETE_ROWS_EVENT",         // 24
+    "INCIDENT_EVENT",            // 25
+	"HEARTBEAT_LOG_EVENT"        // 26
 };
 
-enum e_event_types {
-	UNKNOWN_EVENT=0,
-	START_EVENT_V3=1,
-	QUERY_EVENT=2,
-	STOP_EVENT=3,
-	ROTATE_EVENT=4,
-	INTVAR_EVENT=5,
-	LOAD_EVENT=6,
-	SLAVE_EVENT=7,
-	CREATE_FILE_EVENT=8,
-	APPEND_BLOCK_EVENT=9,
-	EXEC_LOAD_EVENT=10,
-	DELETE_FILE_EVENT=11,
-	NEW_LOAD_EVENT=12,
-	RAND_EVENT=13,
-	USER_VAR_EVENT=14,
-	FORMAT_DESCRIPTION_EVENT=15,
-	XID_EVENT=16,
-	BEGIN_LOAD_QUERY_EVENT=17,
-	EXECUTE_LOAD_QUERY_EVENT=18,
-	TABLE_MAP_EVENT=19,
-	PRE_GA_WRITE_ROWS_EVENT=20,
-	PRE_GA_DELETE_ROWS_EVENT=21,
-	WRITE_ROWS_EVENT=22,
-	UPDATE_ROWS_EVENT=23,
-	DELETE_ROWS_EVENT=24,
-	INCIDENT_EVENT=25,
-	HEARTBEAT_LOG_EVENT=26
+const char* event_type(enum e_event_type e) {
+    return _event_types[e];
+}
+
+char* _variable_types[NUM_VARIABLE_TYPES] = {
+	"Q_FLAGS2_CODE",              // 0
+	"Q_SQL_MODE_CODE",            // 1
+	"Q_CATALOG_CODE",             // 2
+	"Q_AUTO_INCREMENT",           // 3
+	"Q_CHARSET_CODE",             // 4
+	"Q_TIME_ZONE_CODE",           // 5
+	"Q_CATALOG_NZ_CODE",          // 6
+	"Q_LC_TIME_NAMES_CODE",       // 7
+	"Q_CHARSET_DATABASE_CODE",    // 8
+	"Q_TABLE_MAP_FOR_UPDATE_CODE",// 9
 };
 
-char* variable_types[10] = {
-	"Q_FLAGS2_CODE",			// 0
-	"Q_SQL_MODE_CODE",			// 1
-	"Q_CATALOG_CODE",			// 2
-	"Q_AUTO_INCREMENT",			// 3
-	"Q_CHARSET_CODE",			// 4
-	"Q_TIME_ZONE_CODE",			// 5
-	"Q_CATALOG_NZ_CODE",			// 6
-	"Q_LC_TIME_NAMES_CODE",			// 7
-	"Q_CHARSET_DATABASE_CODE",		// 8
-	"Q_TABLE_MAP_FOR_UPDATE_CODE",		// 9
-};
+const char* variable_type(enum e_variable_type e) {
+    return _variable_types[e];
+}
 
-char* intvar_types[3] = {
-	"",
-	"LAST_INSERT_ID_EVENT",			// 1
-	"INSERT_ID_EVENT",			// 2
+char* _intvar_types[NUM_INTVAR_TYPES] = {
+	"",                           // 0 is unused
+	"LAST_INSERT_ID_EVENT",       // 1
+	"INSERT_ID_EVENT",            // 2
 };
+const char* intvar_type(enum e_intvar_type e) {
+    return _intvar_types[e];
+}
 
-char* flags[16] = {
+char *_flags[NUM_FLAGS] = {
 	"LOG_EVENT_BINLOG_IN_USE",		// 0x01
 	"LOG_EVENT_FORCED_ROTATE",		// 0x02 (deprecated)
 	"LOG_EVENT_THREAD_SPECIFIC",		// 0x04
@@ -128,10 +107,15 @@ char* flags[16] = {
 	"",
 	"",
 };
+const char* flag_name(enum e_flag e) {
+    return _flags[e];
+}
+
 
 int q_mode = 0;
 int v_mode = 0;
 int Q_mode = 0;
+int z_mode = 0;
 struct stat stbuf;
 char* database_limit = NULL;
 
@@ -140,7 +124,7 @@ void print_statement_event(struct event *e)
 	if (e-> data == NULL) {
 		return;
 	}
-	switch ((enum e_event_types)e->type_code) {
+	switch ((enum e_event_type)e->type_code) {
 		case QUERY_EVENT:
 			{
 			size_t statement_len = query_event_statement_len(e);
@@ -155,7 +139,11 @@ void print_statement_event(struct event *e)
 				return;
 			}
 			if ((Q_mode <= 1) || (strncmp(statement, "BEGIN", 5) != 0)) {
-				printf("%s;\n", statement);
+                if (z_mode) {
+                    printf("%s%c", statement, 0);
+                } else {
+                    printf("%s;\n", statement);
+                }
 			}
 			free(statement);
 			break;
@@ -180,15 +168,15 @@ void print_event(struct event *e)
     }
 	printf("BYTE OFFSET %llu\n", (long long)e->offset);
 	printf("------------------------\n");
-	printf("timestamp:		  %d = %s", e->timestamp, ctime(&t));
-	printf("type_code:		  %s\n", event_types[e->type_code]);
+	printf("timestamp:          %d = %s", e->timestamp, ctime(&t));
+	printf("type_code:          %s\n", event_type(e->type_code));
 	if (q_mode > 1)
 		return;
-	printf("server id:		  %u\n", e->server_id);
+	printf("server id:          %u\n", e->server_id);
 	if (v_mode)
-		printf("length:			 %d\n", e->length);
-		printf("next pos:		   %llu\n", (unsigned long long)e->next_position);
-	printf("flags:			  ");
+    	printf("length:             %d\n", e->length);
+		printf("next pos:           %llu\n", (unsigned long long)e->next_position);
+	printf("flags:        	    ");
 	for(i=16; i > 0; --i)
 	{
 		printf("%hhd", GET_BIT(e->flags, i));
@@ -197,12 +185,12 @@ void print_event(struct event *e)
 	for(i=16; i > 0; --i)
 	{
 		if (GET_BIT(e->flags, i))
-			printf("						%s\n", flags[i-1]);
+			printf("						%s\n", flag_name(i-1));
 	}
 	if (e->data == NULL) {
 		return;
 	}
-	switch ((enum e_event_types)e->type_code) {
+	switch ((enum e_event_type)e->type_code) {
 		case QUERY_EVENT:
 			{
 			struct query_event *q = (struct query_event*)e->data;
@@ -217,19 +205,19 @@ void print_event(struct event *e)
 				perror("strndup");
 				return;
 			}
-			printf("thread id:		  %d\n", q->thread_id);
-			printf("query time (s):	 %d\n", q->query_time);
+			printf("thread id:          %d\n", q->thread_id);
+			printf("query time (s):     %d\n", q->query_time);
 			if (q->error_code == 0) {
-				printf("error code:		 %d\n", q->error_code);
+				printf("error code:         %d\n", q->error_code);
 			}
 			else {
-				printf("ERROR CODE:		 %d\n", q->error_code);
+				printf("ERROR CODE:         %d\n", q->error_code);
 			}
 			printf("status var length:  %d\n", q->status_var_len);
-			printf("db_name:			%s\n", db_name);
+			printf("db_name:            %s\n", db_name);
 			printf("statement length:   %zd\n", statement_len);
 			if (q_mode == 0)
-				printf("statement:		  %s\n", statement);
+    			printf("statement:          %s\n", statement);
 			free(statement);
 			}
 			break;
@@ -238,36 +226,36 @@ void print_event(struct event *e)
 			struct rotate_event *r = (struct rotate_event*)e->data;
 			char *file_name = strndup((const char*)rotate_event_file_name(e), rotate_event_file_name_len(e));
 			printf("next log position:  %llu\n", (unsigned long long)r->next_position);
-			printf("next file name:	 %s\n", file_name);
+			printf("next file name:     %s\n", file_name);
 			free(file_name);
 			}
 			break;
 		case INTVAR_EVENT:
 			{
 			struct intvar_event *i = (struct intvar_event*)e->data;
-			printf("variable type:	  %s\n", intvar_types[i->type]);
-			printf("value: 				%llu\n", (unsigned long long) i->value);
+			printf("variable type:      %s\n", intvar_type(i->type));
+			printf("value:              %llu\n", (unsigned long long) i->value);
 			}
 			break;
 		case RAND_EVENT:
 			{
 			struct rand_event *r = (struct rand_event*)e->data;
-			printf("seed 1:				%llu\n", (unsigned long long) r->seed_1);
-			printf("seed 2:				%llu\n", (unsigned long long) r->seed_2);
+			printf("seed 1:             %llu\n", (unsigned long long) r->seed_1);
+			printf("seed 2:             %llu\n", (unsigned long long) r->seed_2);
 			}
 			break;
 		case FORMAT_DESCRIPTION_EVENT:
 			{
 			struct format_description_event *f = (struct format_description_event*)e->data;
-			printf("binlog version:	 %d\n", f->format_version);
-			printf("server version:	 %s\n", f->server_version);
-			printf("variable length: %d\n", format_description_event_data_len(e));
+			printf("binlog version:     %d\n", f->format_version);
+			printf("server version:     %s\n", f->server_version);
+			printf("variable length:    %d\n", format_description_event_data_len(e));
 			}
 			break;
 		case XID_EVENT:
 			{
 			struct xid_event *x = (struct xid_event*)e->data;
-			printf("xid id:			 %llu\n", (unsigned long long)x->id);
+			printf("xid id:             %llu\n", (unsigned long long)x->id);
 			}
 			break;
 		default:
@@ -290,6 +278,7 @@ void usage(void)
 	fprintf(stderr, "\t-q\t\t\tBe quieter (may be specified more than once)\n");
 	fprintf(stderr, "\t-Q\t\t\tOnly print QUERY_EVENTS, and only print the statement\n");
 	fprintf(stderr, "\t\t\t\tIf passed twice, do not print transaction events\n");
+    fprintf(stderr, "\t-z\t\t\tUse NUL as the separator between events\n");
 	fprintf(stderr, "\t-D DBNAME\t\tFilter query events that were not in DBNAME\n");
     fprintf(stderr, "\t\t\t\tNote that this still shows transaction control events\n");
     fprintf(stderr, "\t\t\t\tsince those do not have an associated database. Mea culpa.\n");
@@ -573,7 +562,7 @@ int main(int argc, char **argv)
 	init_ybinlogp();
 
 	/* Parse args */
-	while ((opt = getopt(argc, argv, "ht:o:a:qQvD:")) != -1) {
+	while ((opt = getopt(argc, argv, "zht:o:a:qQvD:")) != -1) {
 		switch (opt) {
 			case 't':		/* Time mode */
 				target_time = atol(optarg);
