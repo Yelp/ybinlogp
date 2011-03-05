@@ -183,24 +183,24 @@ void print_event(struct event *e)
     }
 	printf("BYTE OFFSET %llu\n", (long long)e->offset);
 	printf("------------------------\n");
-	printf("timestamp:		  %d = %s", e->timestamp, ctime(&t));
-	printf("type_code:		  %s\n", event_types[e->type_code]);
+	printf("timestamp:          %d = %s", e->timestamp, ctime(&t));
+	printf("type_code:          %s\n", event_types[e->type_code]);
 	if (q_mode > 1)
 		return;
-	printf("server id:		  %u\n", e->server_id);
+	printf("server id:          %u\n", e->server_id);
 	if (v_mode)
-		printf("length:			 %d\n", e->length);
-		printf("next pos:		   %llu\n", (unsigned long long)e->next_position);
-	printf("flags:			  ");
+        printf("length:             %d\n", e->length);
+		printf("next pos:           %llu\n", (unsigned long long)e->next_position);
+	printf("flags:              ");
 	for(i=16; i > 0; --i)
 	{
 		printf("%hhd", GET_BIT(e->flags, i));
 	}
 	printf("\n");
 	for(i=16; i > 0; --i)
-	{
+    {
 		if (GET_BIT(e->flags, i))
-			printf("						%s\n", flags[i-1]);
+            printf("	                    %s\n", flags[i-1]);
 	}
 	if (e->data == NULL) {
 		return;
@@ -220,19 +220,19 @@ void print_event(struct event *e)
 				perror("strndup");
 				return;
 			}
-			printf("thread id:		  %d\n", q->thread_id);
-			printf("query time (s):	 %d\n", q->query_time);
+			printf("thread id:          %d\n", q->thread_id);
+			printf("query time (s):     %d\n", q->query_time);
 			if (q->error_code == 0) {
-				printf("error code:		 %d\n", q->error_code);
+				printf("error code:         %d\n", q->error_code);
 			}
 			else {
-				printf("ERROR CODE:		 %d\n", q->error_code);
+				printf("ERROR CODE:         %d\n", q->error_code);
 			}
 			printf("status var length:  %d\n", q->status_var_len);
-			printf("db_name:			%s\n", db_name);
+			printf("db_name:            %s\n", db_name);
 			printf("statement length:   %zd\n", statement_len);
 			if (q_mode == 0)
-				printf("statement:		  %s\n", statement);
+				printf("statement:          %s\n", statement);
 			free(statement);
 			}
 			break;
@@ -241,36 +241,36 @@ void print_event(struct event *e)
 			struct rotate_event *r = (struct rotate_event*)e->data;
 			char *file_name = strndup((const char*)rotate_event_file_name(e), rotate_event_file_name_len(e));
 			printf("next log position:  %llu\n", (unsigned long long)r->next_position);
-			printf("next file name:	 %s\n", file_name);
+			printf("next file name:     %s\n", file_name);
 			free(file_name);
 			}
 			break;
 		case INTVAR_EVENT:
 			{
 			struct intvar_event *i = (struct intvar_event*)e->data;
-			printf("variable type:	  %s\n", intvar_types[i->type]);
-			printf("value: 				%llu\n", (unsigned long long) i->value);
+			printf("variable type:      %s\n", intvar_types[i->type]);
+			printf("value:              %llu\n", (unsigned long long) i->value);
 			}
 			break;
 		case RAND_EVENT:
 			{
 			struct rand_event *r = (struct rand_event*)e->data;
-			printf("seed 1:				%llu\n", (unsigned long long) r->seed_1);
-			printf("seed 2:				%llu\n", (unsigned long long) r->seed_2);
+			printf("seed 1:             %llu\n", (unsigned long long) r->seed_1);
+			printf("seed 2:             %llu\n", (unsigned long long) r->seed_2);
 			}
 			break;
 		case FORMAT_DESCRIPTION_EVENT:
 			{
 			struct format_description_event *f = (struct format_description_event*)e->data;
-			printf("binlog version:	 %d\n", f->format_version);
-			printf("server version:	 %s\n", f->server_version);
-			printf("variable length:	%d\n", format_description_event_data_len(e));
+			printf("binlog version:     %d\n", f->format_version);
+			printf("server version:     %s\n", f->server_version);
+			printf("variable length:    %d\n", format_description_event_data_len(e));
 			}
 			break;
 		case XID_EVENT:
 			{
 			struct xid_event *x = (struct xid_event*)e->data;
-			printf("xid id:			 %llu\n", (unsigned long long)x->id);
+			printf("xid id:             %llu\n", (unsigned long long)x->id);
 			}
 			break;
 		default:
