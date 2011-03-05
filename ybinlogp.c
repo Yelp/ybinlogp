@@ -127,6 +127,79 @@ char* flags[16] = {
 	"",
 };
 
+char* flags2[32] = {
+	"", // 0x01
+	"", // 0x02
+	"", // 0x04
+	"", // 0x08
+	"", // 0x10
+	"", // 0x20
+	"", // 0x40
+	"", // 0x80
+	"", // 0x100
+	"", // 0x200
+	"", // 0x400
+	"", // 0x800
+	"", // 0x1000
+	"", // 0x2000
+	"OPTION_AUTO_IS_NULL", // 0x4000
+	"", // 0x8000
+	"", // 0x10000
+	"", // 0x20000
+	"", // 0x40000
+	"OPTION_NOT_AUTOCOMMIT", // 0x80000
+	"", // 0x100000
+	"", // 0x200000
+	"", // 0x400000
+	"", // 0x800000
+	"", // 0x1000000
+	"", // 0x2000000
+	"OPTION_NO_FOREIGN_KEY_CHECKS", // 0x4000000
+	"OPTION_RELAXED_UNIQUE_CHECKS", // 0x8000000
+};
+
+/* Map of the lengths of status var data.
+ * -1 indicates variable (the first byte is a length byte)
+ */
+int status_var_data_len_by_type[10] = {
+	4, // 0 = Q_FLAGS2_CODE
+	8, // 1 = Q_SQL_MODE_CODE
+	-1,// 2 = Q_CATALOG_CODE (length byte + string + NUL)
+	4, // 3 = Q_AUTO_INCREMENT (2 2-byte ints)
+	6, // 4 = Q_CHARSET_CODE (3 2-byte ints)
+	-1,// 5 = Q_TIME_ZONE_CODE (length byte + string + NUL)
+	-1,// 6 = Q_CATALOG_NZ_CODE (length byte + string + NUL)
+	2, // 7 = Q_LC_TIME_NAMES_COE
+	2, // 8 = Q_CHARSET_DATABASE_CODE
+	8, // 9 = Q_TABLE_MAP_FOR_UPDATE_COE
+};
+
+enum e_status_var_types {
+	Q_FLAGS2_CODE=0,
+	Q_SQL_MODE_CODE=1,
+	Q_CATALOG_CODE=2,
+	Q_AUTO_INCREMENT=3,
+	Q_CHARSET_CODE=4,
+	Q_TIME_ZONE_CODE=5,
+	Q_CATALOG_NZ_CODE=6,
+	Q_LC_TIME_NAMES_CODE=7,
+	Q_CHARSET_DATABASE_CODE=8,
+	Q_TABLE_MAP_FOR_UPDATE_CODE=9
+};
+
+const char* status_var_types[10] = {
+	"Q_FLAGS2_CODE",
+	"Q_SQL_MODE_CODE",
+	"Q_CATALOG_CODE",
+	"Q_AUTO_INCREMENT",
+	"Q_CHARSET_CODE",
+	"Q_TIME_ZONE_CODE",
+	"Q_CATALOG_NZ_CODE",
+	"Q_LC_TIME_NAMES_CODE",
+	"Q_CHARSET_DATABASE_CODE",
+	"Q_TABLE_MAP_FOR_UPDATE_CODE"
+};
+
 int q_mode = 0;
 int v_mode = 0;
 int Q_mode = 0;
@@ -224,7 +297,112 @@ void print_event(struct event *e)
 				printf("ERROR CODE:		 %d\n", q->error_code);
 			}
 			printf("status var length:  %d\n", q->status_var_len);
-			printf("db_name:			%s\n", db_name);
+			printf("db_name:            %s\n", db_name);
+			if (q->status_var_len > 0) {
+				char* status_var_start = query_event_status_vars(e);
+				char* status_var_ptr = status_var_start;
+				while((status_var_ptr - status_var_start) < q->status_var_len) {
+					enum e_status_var_types status_var_type = *status_var_ptr;
+					status_var_ptr++;
+					assert(status_var_type < 10);
+					switch (status_var_type) {
+						case Q_FLAGS2_CODE:
+							{
+							uint32_t val = *((uint32_t*)status_var_ptr);
+							status_var_ptr += 4;
+							printf("Q_FLAGS2:           ");
+							for(i=32; i > 0; --i)
+							{
+								printf("%hhd", GET_BIT(val, i));
+							}
+							printf("\n");
+							for(i=32; i > 0; --i)
+							{
+								if (GET_BIT(val, i))
+									printf("	                    %s\n", flags2[i-1]);
+							}
+							break;
+							}
+						case Q_SQL_MODE_CODE:
+							{
+							uint64_t val = *((uint64_t*)status_var_ptr);
+							status_var_ptr += 8;
+							printf("Q_SQL_MODE:         0x%0llu\n", (unsigned long long)val);
+							break;
+							}
+						case Q_CATALOG_CODE:
+							{
+							uint8_t size = *(status_var_ptr++);
+							char* str = strndup(status_var_ptr, size+1);
+							status_var_ptr += size + 1;
+							printf("Q_CATALOG:          %s\n", str);
+							free(str);
+							break;
+							}
+						case Q_AUTO_INCREMENT:
+							{
+							uint16_t byte_1 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							uint16_t byte_2 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							printf("Q_AUTO_INCREMENT:   (%hu,%hu)\n", byte_1, byte_2);
+							break;
+							}
+						case Q_CHARSET_CODE:
+							{
+							uint16_t byte_1 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							uint16_t byte_2 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							uint16_t byte_3 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							printf("Q_CHARSET:          (%hu,%hu,%hu)\n", byte_1, byte_2, byte_3);
+							break;
+							}
+						case Q_TIME_ZONE_CODE:
+							{
+							uint8_t size = *(status_var_ptr++);
+							char* str = strndup(status_var_ptr, size);
+							status_var_ptr += size;
+							printf("Q_TIME_ZONE:        %s\n", str);
+							free(str);
+							break;
+							}
+						case Q_CATALOG_NZ_CODE:
+							{
+							uint8_t size = *(status_var_ptr++);
+							char* str = strndup(status_var_ptr, size);
+							status_var_ptr += size;
+							printf("Q_CATALOG_NZ:       %s\n", str);
+							free(str);
+							break;
+							}
+						case Q_LC_TIME_NAMES_CODE:
+							{
+							uint16_t code = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							printf("Q_LC_TIME_NAMES:    %hu\n", code);
+							break;
+							}
+						case Q_CHARSET_DATABASE_CODE:
+							{
+							uint16_t code = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							printf("Q_CHARSET_DATABASE: %hu\n", code);
+							break;
+							}
+						default:
+							{
+							int incr = status_var_data_len_by_type[status_var_type];
+							assert(incr >= 0);
+							status_var_ptr += incr;
+							printf("	                    %s\n", status_var_types[status_var_type]);
+							break;
+							}
+					}
+				}
+			}
+			printf("db_name:            %s\n", db_name);
 			printf("statement length:   %zd\n", statement_len);
 			if (q_mode == 0)
 				printf("statement:		  %s\n", statement);
