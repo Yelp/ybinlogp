@@ -30,10 +30,10 @@
 #define MIN_TYPE_CODE 0
 #define MAX_TYPE_CODE 27
 #define MIN_EVENT_LENGTH 19
-#define MAX_EVENT_LENGTH 10485760		/* Can't see why you'd have events >10MB. */
-#define MAX_SERVER_ID 4294967295		/* 0 <= server_id  <= 2**31 */
-time_t MIN_TIMESTAMP;				/* set to the time in the FDE */
-time_t MAX_TIMESTAMP;				/* Set this time(NULL) on startup */
+#define MAX_EVENT_LENGTH 10485760  // Can't see why you'd have events >10MB.
+#define MAX_SERVER_ID 4294967295   // 0 <= server_id  <= 2**31
+time_t MIN_TIMESTAMP;              // set to the time in the FDE
+time_t MAX_TIMESTAMP;              // Set this time(NULL) on startup
 
 uint32_t SLAVE_SERVER_ID;
 uint32_t MASTER_SERVER_ID;
@@ -42,33 +42,33 @@ int ENFORCE_SERVER_ID = 1;
 
 
 char* event_types[27] = {
-	"UNKNOWN_EVENT",			// 0
-	"START_EVENT_V3",			// 1
-	"QUERY_EVENT",				// 2
-	"STOP_EVENT",				// 3
-	"ROTATE_EVENT",				// 4
-	"INTVAR_EVENT",				// 5
-	"LOAD_EVENT",				// 6
-	"SLAVE_EVENT",				// 7
-	"CREATE_FILE_EVENT",			// 8
-	"APPEND_BLOCK_EVENT",			// 9
-	"EXEC_LOAD_EVENT",			// 10
-	"DELETE_FILE_EVENT",			// 11
-	"NEW_LOAD_EVENT",			// 12
-	"RAND_EVENT",				// 13
-	"USER_VAR_EVENT",			// 14
-	"FORMAT_DESCRIPTION_EVENT",		// 15
-	"XID_EVENT",				// 16
-	"BEGIN_LOAD_QUERY_EVENT",		// 17
-	"EXECUTE_LOAD_QUERY_EVENT",		// 18
-	"TABLE_MAP_EVENT",			// 19
-	"PRE_GA_WRITE_ROWS_EVENT",		// 20
-	"PRE_GA_DELETE_ROWS_EVENT",		// 21
-	"WRITE_ROWS_EVENT",			// 22
-	"UPDATE_ROWS_EVENT",			// 23
-	"DELETE_ROWS_EVENT",			// 24
-	"INCIDENT_EVENT",			// 25
-	"HEARTBEAT_LOG_EVENT"			// 26
+	"UNKNOWN_EVENT",            // 0
+	"START_EVENT_V3",           // 1
+	"QUERY_EVENT",              // 2
+	"STOP_EVENT",               // 3
+	"ROTATE_EVENT",             // 4
+	"INTVAR_EVENT",             // 5
+	"LOAD_EVENT",               // 6
+	"SLAVE_EVENT",              // 7
+	"CREATE_FILE_EVENT",        // 8
+	"APPEND_BLOCK_EVENT",       // 9
+	"EXEC_LOAD_EVENT",          // 10
+	"DELETE_FILE_EVENT",        // 11
+	"NEW_LOAD_EVENT",           // 12
+	"RAND_EVENT",               // 13
+	"USER_VAR_EVENT",           // 14
+	"FORMAT_DESCRIPTION_EVENT", // 15
+	"XID_EVENT",                // 16
+	"BEGIN_LOAD_QUERY_EVENT",   // 17
+	"EXECUTE_LOAD_QUERY_EVENT", // 18
+	"TABLE_MAP_EVENT",          // 19
+	"PRE_GA_WRITE_ROWS_EVENT",  // 20
+	"PRE_GA_DELETE_ROWS_EVENT", // 21
+	"WRITE_ROWS_EVENT",         // 22
+	"UPDATE_ROWS_EVENT",        // 23
+	"DELETE_ROWS_EVENT",        // 24
+	"INCIDENT_EVENT",           // 25
+	"HEARTBEAT_LOG_EVENT"	    // 26
 };
 
 enum e_event_types {
@@ -102,32 +102,32 @@ enum e_event_types {
 };
 
 char* variable_types[10] = {
-	"Q_FLAGS2_CODE",			// 0
-	"Q_SQL_MODE_CODE",			// 1
-	"Q_CATALOG_CODE",			// 2
-	"Q_AUTO_INCREMENT",			// 3
-	"Q_CHARSET_CODE",			// 4
-	"Q_TIME_ZONE_CODE",			// 5
-	"Q_CATALOG_NZ_CODE",			// 6
-	"Q_LC_TIME_NAMES_CODE",			// 7
-	"Q_CHARSET_DATABASE_CODE",		// 8
-	"Q_TABLE_MAP_FOR_UPDATE_CODE",		// 9
+	"Q_FLAGS2_CODE",               // 0
+	"Q_SQL_MODE_CODE",             // 1
+	"Q_CATALOG_CODE",              // 2
+	"Q_AUTO_INCREMENT",            // 3
+	"Q_CHARSET_CODE",              // 4
+	"Q_TIME_ZONE_CODE",            // 5
+	"Q_CATALOG_NZ_CODE",           // 6
+	"Q_LC_TIME_NAMES_CODE",        // 7
+	"Q_CHARSET_DATABASE_CODE",     // 8
+	"Q_TABLE_MAP_FOR_UPDATE_CODE", // 9
 };
 
 char* intvar_types[3] = {
 	"",
-	"LAST_INSERT_ID_EVENT",			// 1
-	"INSERT_ID_EVENT",			// 2
+	"LAST_INSERT_ID_EVENT",	       // 1
+	"INSERT_ID_EVENT",             // 2
 };
 
 char* flags[16] = {
-	"LOG_EVENT_BINLOG_IN_USE",		// 0x01
-	"LOG_EVENT_FORCED_ROTATE",		// 0x02 (deprecated)
-	"LOG_EVENT_THREAD_SPECIFIC",		// 0x04
-	"LOG_EVENT_SUPPRESS_USE",		// 0x08
-	"LOG_EVENT_UPDATE_TABLE_MAP_VERSION",	// 0x10
-	"LOG_EVENT_ARTIFICIAL",			// 0x20
-	"LOG_EVENT_RELAY_LOG",			// 0x40
+	"LOG_EVENT_BINLOG_IN_USE",     // 0x01
+	"LOG_EVENT_FORCED_ROTATE",     // 0x02 (deprecated)
+	"LOG_EVENT_THREAD_SPECIFIC",   // 0x04
+	"LOG_EVENT_SUPPRESS_USE",      // 0x08
+	"LOG_EVENT_UPDATE_TABLE_MAP_VERSION", // 0x10
+	"LOG_EVENT_ARTIFICIAL",        // 0x20
+	"LOG_EVENT_RELAY_LOG",         // 0x40
 	"",
 	"",
 };
@@ -567,12 +567,12 @@ int main(int argc, char **argv)
 	/* Parse args */
 	while ((opt = getopt(argc, argv, "ht:o:a:qQvD:S")) != -1) {
 		switch (opt) {
-			case 't':		/* Time mode */
+			case 't':      /* Time mode */
 				target_time = atol(optarg);
 				t_mode = 1;
 				o_mode = 0;
 				break;
-			case 'o':		/* Offset mode */
+            case 'o':      /* Offset mode */
 				starting_offset = atoll(optarg);
 				t_mode  = 0;
 				o_mode = 1;
