@@ -16,6 +16,7 @@ Options:
  *  `-Q                 Only print query statements`
  *  `-QQ                Only print query statements, without transaction indicators`
  *  `-D DBNAME          Filter out query statements not on database DBNAME`
+ *  `-S                 Skip the server-id checks, which might not work with some replication hierarchies`
  *  `-h                 Show help`
  *  `-q                 Be quieter (may be specified multiple times)`
  *  `-v                 Be more verbose`
