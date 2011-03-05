@@ -470,6 +470,7 @@ void print_event(struct event *e)
 			}
 			break;
 		default:
+			printf("event type:         %s\n", event_types[e->type_code]);
 			break;
 	}
 }
