@@ -151,8 +151,8 @@ void print_statement_event(struct event *e)
 			/* Duplicate the statement because the binlog
 			 * doesn't NUL-terminate it. */
 			char *statement;
-            if ((database_limit != NULL) && (strncmp(db_name, database_limit, strlen(database_limit)) != 0))
-                return;
+			if ((database_limit != NULL) && (strncmp(db_name, database_limit, strlen(database_limit)) != 0))
+				return;
 			if ((statement = strndup((const char*)query_event_statement(e), statement_len)) == NULL) {
 				perror("strndup");
 				return;
@@ -179,8 +179,9 @@ void print_event(struct event *e)
 	int i;
 	const time_t t = e->timestamp;
 	if (Q_mode) {
-		return print_statement_event(e);
-    }
+		print_statement_event(e);
+		return;
+	}
 	printf("BYTE OFFSET %llu\n", (long long)e->offset);
 	printf("------------------------\n");
 	printf("timestamp:          %d = %s", e->timestamp, ctime(&t));
@@ -189,9 +190,9 @@ void print_event(struct event *e)
 		return;
 	printf("server id:          %u\n", e->server_id);
 	if (v_mode) {
-        printf("length:             %d\n", e->length);
+		printf("length:             %d\n", e->length);
 		printf("next pos:           %llu\n", (unsigned long long)e->next_position);
-    }
+	}
 	printf("flags:              ");
 	for(i=16; i > 0; --i)
 	{
@@ -199,9 +200,9 @@ void print_event(struct event *e)
 	}
 	printf("\n");
 	for(i=16; i > 0; --i)
-    {
+	{
 		if (GET_BIT(e->flags, i))
-            printf("	                    %s\n", flags[i-1]);
+			printf("	                    %s\n", flags[i-1]);
 	}
 	if (e->data == NULL) {
 		return;
@@ -215,8 +216,8 @@ void print_event(struct event *e)
 			/* Duplicate the statement because the binlog
 			 * doesn't NUL-terminate it. */
 			char* statement;
-            if ((database_limit != NULL) && (strncmp(db_name, database_limit, strlen(database_limit)) != 0))
-                return;
+			if ((database_limit != NULL) && (strncmp(db_name, database_limit, strlen(database_limit)) != 0))
+				return;
 			if ((statement = strndup((const char*)query_event_statement(e), statement_len)) == NULL) {
 				perror("strndup");
 				return;
@@ -295,11 +296,11 @@ void usage(void)
 	fprintf(stderr, "\t-Q\t\t\tOnly print QUERY_EVENTS, and only print the statement\n");
 	fprintf(stderr, "\t\t\t\tIf passed twice, do not print transaction events\n");
 	fprintf(stderr, "\t-D DBNAME\t\tFilter query events that were not in DBNAME\n");
-    fprintf(stderr, "\t\t\t\tNote that this still shows transaction control events\n");
-    fprintf(stderr, "\t\t\t\tsince those do not have an associated database. Mea culpa.\n");
+	fprintf(stderr, "\t\t\t\tNote that this still shows transaction control events\n");
+	fprintf(stderr, "\t\t\t\tsince those do not have an associated database. Mea culpa.\n");
 	fprintf(stderr, "\t-v\t\t\tBe more verbose (may be specified more than once)\n");
 	fprintf(stderr, "\t-S\t\t\tRemove server-id checks (by default, will only allow 1 slave and 1 master server-id in a log file\n");
-    fprintf(stderr, "\t-h\t\t\tShow this help\n");
+	fprintf(stderr, "\t-h\t\t\tShow this help\n");
 }
 
 int check_event(struct event *e)
@@ -572,7 +573,7 @@ int main(int argc, char **argv)
 				t_mode = 1;
 				o_mode = 0;
 				break;
-            case 'o':      /* Offset mode */
+			case 'o':      /* Offset mode */
 				starting_offset = atoll(optarg);
 				t_mode  = 0;
 				o_mode = 1;
@@ -599,9 +600,9 @@ int main(int argc, char **argv)
 			case 'S':
 				ENFORCE_SERVER_ID = 0;
 				break;
-            case 'h':
-                usage();
-                return 0;
+			case 'h':
+				usage();
+				return 0;
 			case '?':
 				fprintf(stderr, "Unknown argument %c\n", optopt);
 				usage();
@@ -679,3 +680,5 @@ int main(int argc, char **argv)
 	dispose_event(evbuf);
 	return exit_status;
 }
+
+/* vim: set noexpandtab ts=4 sw=4: */
