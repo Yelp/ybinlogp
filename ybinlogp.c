@@ -188,9 +188,10 @@ void print_event(struct event *e)
 	if (q_mode > 1)
 		return;
 	printf("server id:          %u\n", e->server_id);
-	if (v_mode)
+	if (v_mode) {
         printf("length:             %d\n", e->length);
 		printf("next pos:           %llu\n", (unsigned long long)e->next_position);
+    }
 	printf("flags:              ");
 	for(i=16; i > 0; --i)
 	{
@@ -297,7 +298,7 @@ void usage(void)
     fprintf(stderr, "\t\t\t\tNote that this still shows transaction control events\n");
     fprintf(stderr, "\t\t\t\tsince those do not have an associated database. Mea culpa.\n");
 	fprintf(stderr, "\t-v\t\t\tBe more verbose (may be specified more than once)\n");
-	fprintf(stderr, "\t-S Remove server-id checks (by default, will only allow 1 slave and 1 master server-id in a log file\n");
+	fprintf(stderr, "\t-S\t\t\tRemove server-id checks (by default, will only allow 1 slave and 1 master server-id in a log file\n");
     fprintf(stderr, "\t-h\t\t\tShow this help\n");
 }
 
@@ -551,7 +552,7 @@ int main(int argc, char **argv)
 	struct event *evbuf = malloc(sizeof(struct event));
 	init_event(evbuf);
 	int opt;
-	off64_t offset = 0;
+	off64_t offset = 4;
 	int shown = 1;
 	
 	time_t target_time = time(NULL);
@@ -564,7 +565,7 @@ int main(int argc, char **argv)
 	MAX_TIMESTAMP = time(NULL);
 
 	/* Parse args */
-	while ((opt = getopt(argc, argv, "ht:o:a:qQvDS:")) != -1) {
+	while ((opt = getopt(argc, argv, "ht:o:a:qQvD:S")) != -1) {
 		switch (opt) {
 			case 't':		/* Time mode */
 				target_time = atol(optarg);
