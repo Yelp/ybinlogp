@@ -275,13 +275,15 @@ void print_event(struct event *e)
 
 void usage(void)
 {
-	fprintf(stderr, "Usage: ybinlogp [mode] logfile\n");
+	fprintf(stderr, "Usage: ybinlogp [args] logfile\n");
 	fprintf(stderr, "\n");
-	fprintf(stderr, "ybinlogp supports several different modes:\n");
+	fprintf(stderr, "ybinlogp supports two different search modes:\n");
 	fprintf(stderr, "\t-o OFFSET\t\tFind the first event after the given offset\n");
 	fprintf(stderr, "\t\t\t\tybinlogp -o offset logfile\n");
 	fprintf(stderr, "\t-t TIMESTAMP\t\tFind the event closest to the given unix time\n");
 	fprintf(stderr, "\t\t\t\tybinlogp -t timestamp logfile\n");
+	fprintf(stderr, "By default, ybinlogp runs as though you had specified -o 4\n");
+	fprintf(stderr, "\nOther arguments:\n");
 	fprintf(stderr, "\t-a COUNT\t\tWhen used with one of the above, print COUNT items after the first one\n");
 	fprintf(stderr, "\t\t\t\tAccepts either an integer or the text 'all'\n");
 	fprintf(stderr, "\t\t\t\tybinlogp -a N -t timestamp logfile\n");
