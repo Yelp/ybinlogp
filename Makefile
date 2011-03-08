@@ -3,7 +3,7 @@ TARGETS := ybinlogp
 
 prefix := /usr
 
-CFLAGS += -Wall -ggdb -Wextra --std=c99
+CFLAGS += -Wall -ggdb -Wextra --std=c99 -pedantic
 #CFLAGS=-Wall -ggdb -Wextra -DDEBUG
 
 all: $(TARGETS)

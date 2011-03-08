@@ -22,7 +22,7 @@
 
 #include "ybinlogp.h"
 
-#define MAX_RETRIES	102400  /* how many bytes to seek ahead looking for a record */
+#define MAX_RETRIES	16*1048576  /* how many bytes to seek ahead looking for a record */
 
 #define GET_BIT(x,bit) (!!(x & 1 << (bit-1)))
 
@@ -30,40 +30,45 @@
 #define MIN_TYPE_CODE 0
 #define MAX_TYPE_CODE 27
 #define MIN_EVENT_LENGTH 19
-#define MAX_EVENT_LENGTH 10485760		/* Can't see why you'd have events >10MB. */
-#define MAX_SERVER_ID 4294967295		/* 0 <= server_id  <= 2**31 */
-time_t MIN_TIMESTAMP;				/* set to the time in the FDE */
-time_t MAX_TIMESTAMP;				/* Set this time(NULL) on startup */
+#define MAX_EVENT_LENGTH 16*1048576  // Max statement len is generally 16MB
+#define MAX_SERVER_ID 4294967295   // 0 <= server_id  <= 2**32
+time_t MIN_TIMESTAMP;              // set to the time in the FDE
+time_t MAX_TIMESTAMP;              // Set this time(NULL) on startup
+
+uint32_t SLAVE_SERVER_ID;
+uint32_t MASTER_SERVER_ID;
+
+int ENFORCE_SERVER_ID = 1;
 
 
 char* event_types[27] = {
-	"UNKNOWN_EVENT",			// 0
-	"START_EVENT_V3",			// 1
-	"QUERY_EVENT",				// 2
-	"STOP_EVENT",				// 3
-	"ROTATE_EVENT",				// 4
-	"INTVAR_EVENT",				// 5
-	"LOAD_EVENT",				// 6
-	"SLAVE_EVENT",				// 7
-	"CREATE_FILE_EVENT",			// 8
-	"APPEND_BLOCK_EVENT",			// 9
-	"EXEC_LOAD_EVENT",			// 10
-	"DELETE_FILE_EVENT",			// 11
-	"NEW_LOAD_EVENT",			// 12
-	"RAND_EVENT",				// 13
-	"USER_VAR_EVENT",			// 14
-	"FORMAT_DESCRIPTION_EVENT",		// 15
-	"XID_EVENT",				// 16
-	"BEGIN_LOAD_QUERY_EVENT",		// 17
-	"EXECUTE_LOAD_QUERY_EVENT",		// 18
-	"TABLE_MAP_EVENT",			// 19
-	"PRE_GA_WRITE_ROWS_EVENT",		// 20
-	"PRE_GA_DELETE_ROWS_EVENT",		// 21
-	"WRITE_ROWS_EVENT",			// 22
-	"UPDATE_ROWS_EVENT",			// 23
-	"DELETE_ROWS_EVENT",			// 24
-	"INCIDENT_EVENT",			// 25
-	"HEARTBEAT_LOG_EVENT"			// 26
+	"UNKNOWN_EVENT",            // 0
+	"START_EVENT_V3",           // 1
+	"QUERY_EVENT",              // 2
+	"STOP_EVENT",               // 3
+	"ROTATE_EVENT",             // 4
+	"INTVAR_EVENT",             // 5
+	"LOAD_EVENT",               // 6
+	"SLAVE_EVENT",              // 7
+	"CREATE_FILE_EVENT",        // 8
+	"APPEND_BLOCK_EVENT",       // 9
+	"EXEC_LOAD_EVENT",          // 10
+	"DELETE_FILE_EVENT",        // 11
+	"NEW_LOAD_EVENT",           // 12
+	"RAND_EVENT",               // 13
+	"USER_VAR_EVENT",           // 14
+	"FORMAT_DESCRIPTION_EVENT", // 15
+	"XID_EVENT",                // 16
+	"BEGIN_LOAD_QUERY_EVENT",   // 17
+	"EXECUTE_LOAD_QUERY_EVENT", // 18
+	"TABLE_MAP_EVENT",          // 19
+	"PRE_GA_WRITE_ROWS_EVENT",  // 20
+	"PRE_GA_DELETE_ROWS_EVENT", // 21
+	"WRITE_ROWS_EVENT",         // 22
+	"UPDATE_ROWS_EVENT",        // 23
+	"DELETE_ROWS_EVENT",        // 24
+	"INCIDENT_EVENT",           // 25
+	"HEARTBEAT_LOG_EVENT"	    // 26
 };
 
 enum e_event_types {
@@ -97,34 +102,113 @@ enum e_event_types {
 };
 
 char* variable_types[10] = {
-	"Q_FLAGS2_CODE",			// 0
-	"Q_SQL_MODE_CODE",			// 1
-	"Q_CATALOG_CODE",			// 2
-	"Q_AUTO_INCREMENT",			// 3
-	"Q_CHARSET_CODE",			// 4
-	"Q_TIME_ZONE_CODE",			// 5
-	"Q_CATALOG_NZ_CODE",			// 6
-	"Q_LC_TIME_NAMES_CODE",			// 7
-	"Q_CHARSET_DATABASE_CODE",		// 8
-	"Q_TABLE_MAP_FOR_UPDATE_CODE",		// 9
+	"Q_FLAGS2_CODE",               // 0
+	"Q_SQL_MODE_CODE",             // 1
+	"Q_CATALOG_CODE",              // 2
+	"Q_AUTO_INCREMENT",            // 3
+	"Q_CHARSET_CODE",              // 4
+	"Q_TIME_ZONE_CODE",            // 5
+	"Q_CATALOG_NZ_CODE",           // 6
+	"Q_LC_TIME_NAMES_CODE",        // 7
+	"Q_CHARSET_DATABASE_CODE",     // 8
+	"Q_TABLE_MAP_FOR_UPDATE_CODE", // 9
 };
 
 char* intvar_types[3] = {
 	"",
-	"LAST_INSERT_ID_EVENT",			// 1
-	"INSERT_ID_EVENT",			// 2
+	"LAST_INSERT_ID_EVENT",	       // 1
+	"INSERT_ID_EVENT",             // 2
 };
 
 char* flags[16] = {
-	"LOG_EVENT_BINLOG_IN_USE",		// 0x01
-	"LOG_EVENT_FORCED_ROTATE",		// 0x02 (deprecated)
-	"LOG_EVENT_THREAD_SPECIFIC",		// 0x04
-	"LOG_EVENT_SUPPRESS_USE",		// 0x08
-	"LOG_EVENT_UPDATE_TABLE_MAP_VERSION",	// 0x10
-	"LOG_EVENT_ARTIFICIAL",			// 0x20
-	"LOG_EVENT_RELAY_LOG",			// 0x40
+	"LOG_EVENT_BINLOG_IN_USE",     // 0x01
+	"LOG_EVENT_FORCED_ROTATE",     // 0x02 (deprecated)
+	"LOG_EVENT_THREAD_SPECIFIC",   // 0x04
+	"LOG_EVENT_SUPPRESS_USE",      // 0x08
+	"LOG_EVENT_UPDATE_TABLE_MAP_VERSION", // 0x10
+	"LOG_EVENT_ARTIFICIAL",        // 0x20
+	"LOG_EVENT_RELAY_LOG",         // 0x40
 	"",
 	"",
+};
+
+/* The mysterious FLAGS2 binlog code.
+ * Seems to be a subset of mysql options.
+ * A very small subset.
+ */
+char* flags2[32] = {
+	"", // 0x01
+	"", // 0x02
+	"", // 0x04
+	"", // 0x08
+	"", // 0x10
+	"", // 0x20
+	"", // 0x40
+	"", // 0x80
+	"", // 0x100
+	"", // 0x200
+	"", // 0x400
+	"", // 0x800
+	"", // 0x1000
+	"", // 0x2000
+	"OPTION_AUTO_IS_NULL", // 0x4000
+	"", // 0x8000
+	"", // 0x10000
+	"", // 0x20000
+	"", // 0x40000
+	"OPTION_NOT_AUTOCOMMIT", // 0x80000
+	"", // 0x100000
+	"", // 0x200000
+	"", // 0x400000
+	"", // 0x800000
+	"", // 0x1000000
+	"", // 0x2000000
+	"OPTION_NO_FOREIGN_KEY_CHECKS", // 0x4000000
+	"OPTION_RELAXED_UNIQUE_CHECKS", // 0x8000000
+};
+
+/* Map of the lengths of status var data.
+ * -1 indicates variable (the first byte is a length byte)
+ *  -2 indicates variable + 1 (the first byte is a length byte that is
+ *  wrong)
+ */
+int status_var_data_len_by_type[10] = {
+	4, // 0 = Q_FLAGS2_CODE
+	8, // 1 = Q_SQL_MODE_CODE
+	-2,// 2 = Q_CATALOG_CODE (length byte + string + NUL)
+	4, // 3 = Q_AUTO_INCREMENT (2 2-byte ints)
+	6, // 4 = Q_CHARSET_CODE (3 2-byte ints)
+	-1,// 5 = Q_TIME_ZONE_CODE (length byte + string)
+	-1,// 6 = Q_CATALOG_NZ_CODE (length byte + string)
+	2, // 7 = Q_LC_TIME_NAMES_COE
+	2, // 8 = Q_CHARSET_DATABASE_CODE
+	8, // 9 = Q_TABLE_MAP_FOR_UPDATE_COE
+};
+
+enum e_status_var_types {
+	Q_FLAGS2_CODE=0,
+	Q_SQL_MODE_CODE=1,
+	Q_CATALOG_CODE=2,
+	Q_AUTO_INCREMENT=3,
+	Q_CHARSET_CODE=4,
+	Q_TIME_ZONE_CODE=5,
+	Q_CATALOG_NZ_CODE=6,
+	Q_LC_TIME_NAMES_CODE=7,
+	Q_CHARSET_DATABASE_CODE=8,
+	Q_TABLE_MAP_FOR_UPDATE_CODE=9
+};
+
+const char* status_var_types[10] = {
+	"Q_FLAGS2_CODE",
+	"Q_SQL_MODE_CODE",
+	"Q_CATALOG_CODE",
+	"Q_AUTO_INCREMENT",
+	"Q_CHARSET_CODE",
+	"Q_TIME_ZONE_CODE",
+	"Q_CATALOG_NZ_CODE",
+	"Q_LC_TIME_NAMES_CODE",
+	"Q_CHARSET_DATABASE_CODE",
+	"Q_TABLE_MAP_FOR_UPDATE_CODE"
 };
 
 int q_mode = 0;
@@ -146,8 +230,8 @@ void print_statement_event(struct event *e)
 			/* Duplicate the statement because the binlog
 			 * doesn't NUL-terminate it. */
 			char *statement;
-            if ((database_limit != NULL) && (strncmp(db_name, database_limit, strlen(database_limit)) != 0))
-                return;
+			if ((database_limit != NULL) && (strncmp(db_name, database_limit, strlen(database_limit)) != 0))
+				return;
 			if ((statement = strndup((const char*)query_event_statement(e), statement_len)) == NULL) {
 				perror("strndup");
 				return;
@@ -174,19 +258,21 @@ void print_event(struct event *e)
 	int i;
 	const time_t t = e->timestamp;
 	if (Q_mode) {
-		return print_statement_event(e);
-    }
+		print_statement_event(e);
+		return;
+	}
 	printf("BYTE OFFSET %llu\n", (long long)e->offset);
 	printf("------------------------\n");
-	printf("timestamp:		  %d = %s", e->timestamp, ctime(&t));
-	printf("type_code:		  %s\n", event_types[e->type_code]);
+	printf("timestamp:          %d = %s", e->timestamp, ctime(&t));
+	printf("type_code:          %s\n", event_types[e->type_code]);
 	if (q_mode > 1)
 		return;
-	printf("server id:		  %u\n", e->server_id);
-	if (v_mode)
-		printf("length:			 %d\n", e->length);
-		printf("next pos:		   %llu\n", (unsigned long long)e->next_position);
-	printf("flags:			  ");
+	printf("server id:          %u\n", e->server_id);
+	if (v_mode) {
+		printf("length:             %d\n", e->length);
+		printf("next pos:           %llu\n", (unsigned long long)e->next_position);
+	}
+	printf("flags:              ");
 	for(i=16; i > 0; --i)
 	{
 		printf("%hhd", GET_BIT(e->flags, i));
@@ -195,7 +281,7 @@ void print_event(struct event *e)
 	for(i=16; i > 0; --i)
 	{
 		if (GET_BIT(e->flags, i))
-			printf("						%s\n", flags[i-1]);
+			printf("	                    %s\n", flags[i-1]);
 	}
 	if (e->data == NULL) {
 		return;
@@ -209,25 +295,144 @@ void print_event(struct event *e)
 			/* Duplicate the statement because the binlog
 			 * doesn't NUL-terminate it. */
 			char* statement;
-            if ((database_limit != NULL) && (strncmp(db_name, database_limit, strlen(database_limit)) != 0))
-                return;
+			if ((database_limit != NULL) && (strncmp(db_name, database_limit, strlen(database_limit)) != 0))
+				return;
 			if ((statement = strndup((const char*)query_event_statement(e), statement_len)) == NULL) {
 				perror("strndup");
 				return;
 			}
-			printf("thread id:		  %d\n", q->thread_id);
-			printf("query time (s):	 %d\n", q->query_time);
+			printf("thread id:          %d\n", q->thread_id);
+			printf("query time (s):     %d\n", q->query_time);
 			if (q->error_code == 0) {
-				printf("error code:		 %d\n", q->error_code);
+				printf("error code:         %d\n", q->error_code);
 			}
 			else {
-				printf("ERROR CODE:		 %d\n", q->error_code);
+				printf("ERROR CODE:         %d\n", q->error_code);
 			}
 			printf("status var length:  %d\n", q->status_var_len);
-			printf("db_name:			%s\n", db_name);
+			printf("db_name:            %s\n", db_name);
+			if (v_mode) {
+				printf("status var length:  %d\n", q->status_var_len);
+			}
+			if (q->status_var_len > 0) {
+				char* status_var_start = query_event_status_vars(e);
+				char* status_var_ptr = status_var_start;
+				while((status_var_ptr - status_var_start) < q->status_var_len) {
+					enum e_status_var_types status_var_type = *status_var_ptr;
+					status_var_ptr++;
+					assert(status_var_type < 10);
+					switch (status_var_type) {
+						case Q_FLAGS2_CODE:
+							{
+							uint32_t val = *((uint32_t*)status_var_ptr);
+							status_var_ptr += 4;
+							printf("Q_FLAGS2:           ");
+							for(i=32; i > 0; --i)
+							{
+								printf("%hhd", GET_BIT(val, i));
+							}
+							printf("\n");
+							for(i=32; i > 0; --i)
+							{
+								if (GET_BIT(val, i))
+									printf("	                    %s\n", flags2[i-1]);
+							}
+							break;
+							}
+						case Q_SQL_MODE_CODE:
+							{
+							uint64_t val = *((uint64_t*)status_var_ptr);
+							status_var_ptr += 8;
+							printf("Q_SQL_MODE:         0x%0llu\n", (unsigned long long)val);
+							break;
+							}
+						case Q_CATALOG_CODE:
+							{
+							uint8_t size = *(status_var_ptr++);
+							char* str = strndup(status_var_ptr, size+1);
+							status_var_ptr += size + 1;
+							printf("Q_CATALOG:          %s\n", str);
+							free(str);
+							break;
+							}
+						case Q_AUTO_INCREMENT:
+							{
+							uint16_t byte_1 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							uint16_t byte_2 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							printf("Q_AUTO_INCREMENT:   (%hu,%hu)\n", byte_1, byte_2);
+							break;
+							}
+						case Q_CHARSET_CODE:
+							{
+							uint16_t byte_1 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							uint16_t byte_2 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							uint16_t byte_3 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							printf("Q_CHARSET:          (%hu,%hu,%hu)\n", byte_1, byte_2, byte_3);
+							break;
+							}
+						case Q_TIME_ZONE_CODE:
+							{
+							uint8_t size = *(status_var_ptr++);
+							char* str = strndup(status_var_ptr, size);
+							status_var_ptr += size;
+							printf("Q_TIME_ZONE:        %s\n", str);
+							free(str);
+							break;
+							}
+						case Q_CATALOG_NZ_CODE:
+							{
+							uint8_t size = *(status_var_ptr++);
+							char* str = strndup(status_var_ptr, size);
+							status_var_ptr += size;
+							printf("Q_CATALOG_NZ:       %s\n", str);
+							free(str);
+							break;
+							}
+						case Q_LC_TIME_NAMES_CODE:
+							{
+							uint16_t code = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							printf("Q_LC_TIME_NAMES:    %hu\n", code);
+							break;
+							}
+						case Q_CHARSET_DATABASE_CODE:
+							{
+							uint16_t code = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							printf("Q_CHARSET_DATABASE: %hu\n", code);
+							break;
+							}
+						default:
+							{
+							int incr = status_var_data_len_by_type[status_var_type];
+							if (incr > 0) {
+								status_var_ptr += incr;
+							}
+							else if (incr == -1) {
+								uint8_t size = *status_var_ptr;
+								status_var_ptr += size + 1;
+							}
+							else if (incr == -2) {
+								uint8_t size = *status_var_ptr;
+								status_var_ptr += size + 2;
+							}
+							else {
+								assert(0);
+							}
+							printf("	                    %s\n", status_var_types[status_var_type]);
+							break;
+							}
+					}
+				}
+			}
 			printf("statement length:   %zd\n", statement_len);
 			if (q_mode == 0)
-				printf("statement:		  %s\n", statement);
+				printf("statement:          %s\n", statement);
 			free(statement);
 			}
 			break;
@@ -236,39 +441,40 @@ void print_event(struct event *e)
 			struct rotate_event *r = (struct rotate_event*)e->data;
 			char *file_name = strndup((const char*)rotate_event_file_name(e), rotate_event_file_name_len(e));
 			printf("next log position:  %llu\n", (unsigned long long)r->next_position);
-			printf("next file name:	 %s\n", file_name);
+			printf("next file name:     %s\n", file_name);
 			free(file_name);
 			}
 			break;
 		case INTVAR_EVENT:
 			{
 			struct intvar_event *i = (struct intvar_event*)e->data;
-			printf("variable type:	  %s\n", intvar_types[i->type]);
-			printf("value: 				%llu\n", (unsigned long long) i->value);
+			printf("variable type:      %s\n", intvar_types[i->type]);
+			printf("value:              %llu\n", (unsigned long long) i->value);
 			}
 			break;
 		case RAND_EVENT:
 			{
 			struct rand_event *r = (struct rand_event*)e->data;
-			printf("seed 1:				%llu\n", (unsigned long long) r->seed_1);
-			printf("seed 2:				%llu\n", (unsigned long long) r->seed_2);
+			printf("seed 1:             %llu\n", (unsigned long long) r->seed_1);
+			printf("seed 2:             %llu\n", (unsigned long long) r->seed_2);
 			}
 			break;
 		case FORMAT_DESCRIPTION_EVENT:
 			{
 			struct format_description_event *f = (struct format_description_event*)e->data;
-			printf("binlog version:	 %d\n", f->format_version);
-			printf("server version:	 %s\n", f->server_version);
-			printf("variable length:	%d\n", format_description_event_data_len(e));
+			printf("binlog version:     %d\n", f->format_version);
+			printf("server version:     %s\n", f->server_version);
+			printf("variable length:    %d\n", format_description_event_data_len(e));
 			}
 			break;
 		case XID_EVENT:
 			{
 			struct xid_event *x = (struct xid_event*)e->data;
-			printf("xid id:			 %llu\n", (unsigned long long)x->id);
+			printf("xid id:             %llu\n", (unsigned long long)x->id);
 			}
 			break;
 		default:
+			printf("event type:         %s\n", event_types[e->type_code]);
 			break;
 	}
 }
@@ -291,15 +497,17 @@ void usage(void)
 	fprintf(stderr, "\t-Q\t\t\tOnly print QUERY_EVENTS, and only print the statement\n");
 	fprintf(stderr, "\t\t\t\tIf passed twice, do not print transaction events\n");
 	fprintf(stderr, "\t-D DBNAME\t\tFilter query events that were not in DBNAME\n");
-    fprintf(stderr, "\t\t\t\tNote that this still shows transaction control events\n");
-    fprintf(stderr, "\t\t\t\tsince those do not have an associated database. Mea culpa.\n");
+	fprintf(stderr, "\t\t\t\tNote that this still shows transaction control events\n");
+	fprintf(stderr, "\t\t\t\tsince those do not have an associated database. Mea culpa.\n");
 	fprintf(stderr, "\t-v\t\t\tBe more verbose (may be specified more than once)\n");
-    fprintf(stderr, "\t-h\t\t\tShow this help\n");
+	fprintf(stderr, "\t-S\t\t\tRemove server-id checks (by default, will only allow 1 slave and 1 master server-id in a log file\n");
+	fprintf(stderr, "\t-h\t\t\tShow this help\n");
 }
 
 int check_event(struct event *e)
 {
-	if (e->server_id < MAX_SERVER_ID &&
+	if ((!ENFORCE_SERVER_ID || (e->server_id == SLAVE_SERVER_ID ||
+			e->server_id == MASTER_SERVER_ID)) &&
 			e->type_code > MIN_TYPE_CODE &&
 			e->type_code < MAX_TYPE_CODE &&
 			e->length > MIN_EVENT_LENGTH &&
@@ -509,10 +717,15 @@ int nearest_time(int fd, time_t target, struct event *outbuf)
 int read_fde(int fd)
 {
 	struct event* evbuf = malloc(sizeof(struct event));
+	off64_t offset;
+	int old_esi = ENFORCE_SERVER_ID;
 	init_event(evbuf);
+
+	ENFORCE_SERVER_ID = 0;
 	if (read_event(fd, evbuf, 4) < 0) {
 		return -1;
 	}
+	ENFORCE_SERVER_ID = old_esi;
 #if DEBUG
 	print_event(evbuf);
 #endif
@@ -522,7 +735,16 @@ int read_fde(int fd)
 		exit(1);
 	}
 	MIN_TIMESTAMP = evbuf->timestamp;
+	SLAVE_SERVER_ID = evbuf->server_id;
+
+	offset = next_after(evbuf);
+	reset_event(evbuf);
+	read_event(fd, evbuf, offset);
+
+	MASTER_SERVER_ID = evbuf->server_id;
 	dispose_event(evbuf);
+
+	lseek(fd, 0, SEEK_SET);
 	return 0;
 }
 
@@ -532,7 +754,7 @@ int main(int argc, char **argv)
 	struct event *evbuf = malloc(sizeof(struct event));
 	init_event(evbuf);
 	int opt;
-	off64_t offset = 0;
+	off64_t offset = 4;
 	int shown = 1;
 	
 	time_t target_time = time(NULL);
@@ -545,14 +767,14 @@ int main(int argc, char **argv)
 	MAX_TIMESTAMP = time(NULL);
 
 	/* Parse args */
-	while ((opt = getopt(argc, argv, "ht:o:a:qQvD:")) != -1) {
+	while ((opt = getopt(argc, argv, "ht:o:a:qQvD:S")) != -1) {
 		switch (opt) {
-			case 't':		/* Time mode */
+			case 't':      /* Time mode */
 				target_time = atol(optarg);
 				t_mode = 1;
 				o_mode = 0;
 				break;
-			case 'o':		/* Offset mode */
+			case 'o':      /* Offset mode */
 				starting_offset = atoll(optarg);
 				t_mode  = 0;
 				o_mode = 1;
@@ -576,9 +798,12 @@ int main(int argc, char **argv)
 			case 'Q':
 				Q_mode++;
 				break;
-            case 'h':
-                usage();
-                return 0;
+			case 'S':
+				ENFORCE_SERVER_ID = 0;
+				break;
+			case 'h':
+				usage();
+				return 0;
 			case '?':
 				fprintf(stderr, "Unknown argument %c\n", optopt);
 				usage();
@@ -656,3 +881,5 @@ int main(int argc, char **argv)
 	dispose_event(evbuf);
 	return exit_status;
 }
+
+/* vim: set noexpandtab ts=4 sw=4: */
