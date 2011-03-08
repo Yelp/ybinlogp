@@ -22,7 +22,7 @@
 
 #include "ybinlogp.h"
 
-#define MAX_RETRIES	102400  /* how many bytes to seek ahead looking for a record */
+#define MAX_RETRIES	16*1048576  /* how many bytes to seek ahead looking for a record */
 
 #define GET_BIT(x,bit) (!!(x & 1 << (bit-1)))
 
@@ -30,8 +30,8 @@
 #define MIN_TYPE_CODE 0
 #define MAX_TYPE_CODE 27
 #define MIN_EVENT_LENGTH 19
-#define MAX_EVENT_LENGTH 10485760  // Can't see why you'd have events >10MB.
-#define MAX_SERVER_ID 4294967295   // 0 <= server_id  <= 2**31
+#define MAX_EVENT_LENGTH 16*1048576  // Max statement len is generally 16MB
+#define MAX_SERVER_ID 4294967295   // 0 <= server_id  <= 2**32
 time_t MIN_TIMESTAMP;              // set to the time in the FDE
 time_t MAX_TIMESTAMP;              // Set this time(NULL) on startup
 
@@ -132,6 +132,10 @@ char* flags[16] = {
 	"",
 };
 
+/* The mysterious FLAGS2 binlog code.
+ * Seems to be a subset of mysql options.
+ * A very small subset.
+ */
 char* flags2[32] = {
 	"", // 0x01
 	"", // 0x02
