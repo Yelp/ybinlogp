@@ -1,2 +1,6 @@
-binlogp
+ybinlogp
+ybinlogp_test
+mysql-bin*
 *.o
+*.so
+*.so.*
