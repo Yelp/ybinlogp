@@ -37,6 +37,11 @@
 #define MAX_EVENT_LENGTH 16*1048576  // Max statement len is generally 16MB
 #define MAX_SERVER_ID 4294967295   // 0 <= server_id  <= 2**32
 
+/******* more defines ********/
+#define MAX_RETRIES	16*1048576  /* how many bytes to seek ahead looking for a record */
+
+#define GET_BIT(x,bit) (!!(x & 1 << (bit-1)))
+
 /******* various mappings ********/
 static char* ybpi_event_types[27] = {
 	"UNKNOWN_EVENT",            // 0
@@ -203,8 +208,16 @@ int ybp_init_binlog_parser(int fd, struct ybp_binlog_parser** restrict out)
 	result->min_timestamp = 0;
 	result->max_timestamp = time(NULL);
 	result->has_read_fde = false;
+	ybp_update_bp(result);
 	*out = result;
 	return 0;
+}
+
+void ybp_update_bp(struct ybp_binlog_parser* p)
+{
+	struct stat stbuf;
+	fstat(p->fd, &stbuf);
+	p->file_size = stbuf.st_size;
 }
 
 void ybp_dispose_binlog_parser(struct ybp_binlog_parser* p)
@@ -226,6 +239,22 @@ void ybp_dispose_event(struct ybp_event* evbuf)
 		evbuf->data = 0;
 	}
 	free(evbuf);
+}
+
+int ybp_copy_event(struct ybp_event *dest, struct ybp_event *source)
+{
+	Dprintf("About to copy 0x%p to 0x%p\n", source, dest);
+	memmove(dest, source, sizeof(struct ybp_event));
+	if (source->data != 0) {
+		Dprintf("mallocing %d bytes for the target\n", source->length - EVENT_HEADER_SIZE);
+		if ((dest->data = malloc(source->length - EVENT_HEADER_SIZE)) == NULL) {
+			perror("malloc:");
+			return -1;
+		}
+		Dprintf("copying extra data from 0x%p to 0x%p\n", source->data, dest->data);
+		memmove(dest->data, source->data, source->length - EVENT_HEADER_SIZE);
+	}
+	return 0;
 }
 
 void ybp_reset_event(struct ybp_event* evbuf)
@@ -268,6 +297,42 @@ static off64_t ybpi_next_after(struct ybp_event *evbuf) {
 	 * Usually, only the FDE is from the slave. But, still...
 	 */
 	return evbuf->offset + evbuf->length;
+}
+
+/*
+ * Get the first event after starting_offset in fd
+ *
+ * If evbuf is non-null, copy it into there
+ */
+off64_t ybp_nearest_offset(struct ybp_binlog_parser* p, off64_t starting_offset, struct ybp_event *outbuf, enum ybp_search_direction direction)
+{
+	unsigned int num_increments = 0;
+	off64_t offset;
+	struct ybp_event *evbuf = malloc(sizeof(struct ybp_event));
+	ybp_init_event(evbuf);
+	offset = starting_offset;
+	Dprintf("In nearest offset mode, got fd=%d, starting_offset=%llu\n", fd, (long long)starting_offset);
+	while (num_increments < MAX_RETRIES && offset >= 0 && offset <= p->file_size - EVENT_HEADER_SIZE) 
+	{
+		ybp_reset_event(evbuf);
+		if (ybpi_read_event(p, offset, evbuf) < 0) {
+			ybp_dispose_event(evbuf);
+			return -1;
+		}
+		if (ybpi_check_event(evbuf, p)) {
+			if (outbuf != NULL) {
+				ybp_copy_event(outbuf, evbuf);
+			}
+			ybp_dispose_event(evbuf);
+			return offset;
+		} else {
+			offset += direction;
+			++num_increments;
+		}
+	}
+	ybp_dispose_event(evbuf);
+	Dprintf("Unable to find anything (offset=%llu)\n",(long long) offset);
+	return -2;
 }
 
 /**
@@ -369,9 +434,10 @@ int ybp_next_event(struct ybp_binlog_parser* parser, struct ybp_event* evbuf)
 	}
 }
 
-struct ybp_format_description_event* ybp_event_as_fde(struct ybp_event* e)
+struct ybp_format_description_event* ybp_event_as_fde(struct ybp_event* restrict e)
 {
 	if (e->type_code != FORMAT_DESCRIPTION_EVENT) {
+		fprintf(stderr, "Illegal conversion attempted: %d -> %d\n", e->type_code, FORMAT_DESCRIPTION_EVENT);
 		return NULL;
 	}
 	else {
@@ -379,7 +445,312 @@ struct ybp_format_description_event* ybp_event_as_fde(struct ybp_event* e)
 	}
 }
 
-char* ybp_event_type(struct ybp_event* evbuf) {
+struct ybp_query_event* ybp_event_as_qe(struct ybp_event* restrict e)
+{
+	if (e->type_code != QUERY_EVENT) {
+		fprintf(stderr, "Illegal conversion attempted: %d -> %d\n", e->type_code, QUERY_EVENT);
+		return NULL;
+	} else {
+		return (struct ybp_query_event*)(e->data);
+	}
+}
+
+struct ybp_query_event_safe* ybp_event_to_safe_qe(struct ybp_event* restrict e) {
+	struct ybp_query_event_safe* s;
+	if (e->type_code != QUERY_EVENT) {
+		fprintf(stderr, "Illegal conversion attempted: %d -> %d\n", e->type_code, QUERY_EVENT);
+		return NULL;
+	} else {
+		struct ybp_query_event* qe = (struct ybp_query_event*)(e->data);
+		s = malloc(sizeof(struct ybp_query_event_safe));
+		s->thread_id = qe->thread_id;
+		s->query_time = qe->query_time;
+		s->db_name_len = qe->db_name_len;
+		s->error_code = qe->error_code;
+		s->status_var_len = qe->status_var_len;
+		if (s == NULL) {
+			perror("malloc");
+			return NULL;
+		}
+		s->statement_len = query_event_statement_len(e);
+		s->statement = strndup((const char*)query_event_statement(e), s->statement_len);
+		if (s->statement == NULL) {
+			perror("strndup");
+			return NULL;
+		}
+		s->db_name = strndup((char*)query_event_db_name(e), s->db_name_len);
+		s->status_var = strndup((char*)query_event_status_vars(e), s->status_var_len);
+	}
+	return s;
+}
+
+void ybp_dispose_safe_qe(struct ybp_query_event_safe* s)
+{
+	if (s == NULL) {
+		return;
+	}
+	if (s->statement != NULL)
+		free(s->statement);
+}
+
+struct ybp_rotate_event_safe* ybp_event_to_safe_re(struct ybp_event* restrict e) {
+	struct ybp_rotate_event_safe* s;
+	if (e->type_code != ROTATE_EVENT) {
+		fprintf(stderr, "Illegal conversion attempted: %d -> %d\n", e->type_code, ROTATE_EVENT);
+	} else {
+		struct ybp_rotate_event* re = (struct ybp_rotate_event*)(e->data);
+		s = malloc(sizeof(struct ybp_rotate_event_safe));
+		s->next_position = re->next_position;
+		s->file_name_len = rotate_event_file_name_len(e);
+		s->file_name = strndup((char*)rotate_event_file_name(e), s->file_name_len);
+	}
+	return s;
+}
+
+char* ybp_event_type(struct ybp_event* restrict evbuf) {
 	Dprintf("Looking up type string for %d", evbuf->type_code);
 	return ybpi_event_types[evbuf->type_code];
+}
+
+void ybp_print_event_simple(struct ybp_event* restrict e,
+		struct ybp_binlog_parser* restrict p,
+		FILE* restrict stream)
+{
+	ybp_print_event(e, p, stream, 0, 0, NULL);
+}
+
+void ybp_print_event(struct ybp_event* restrict e,
+		struct ybp_binlog_parser* restrict p,
+		FILE* restrict stream,
+		bool q_mode,
+		bool v_mode,
+		char* database_limit)
+{
+	(void) p;
+	int i;
+	const time_t t = e->timestamp;
+	if (stream == NULL) {
+		stream = stdout;
+	}
+	/* TODO: implement abbreviated parsing mode
+	if (p->Q_mode) {
+		print_statement_event(e);
+		return;
+	}
+	*/
+	fprintf(stream, "BYTE OFFSET %llu\n", (long long)e->offset);
+	fprintf(stream, "------------------------\n");
+	fprintf(stream, "timestamp:          %d = %s", e->timestamp, ctime(&t));
+	fprintf(stream, "type_code:          %s\n", ybpi_event_types[e->type_code]);
+	if (q_mode > 1)
+		return;
+	fprintf(stream, "server id:          %u\n", e->server_id);
+	if (v_mode) {
+		fprintf(stream, "length:             %d\n", e->length);
+		fprintf(stream, "next pos:           %llu\n", (unsigned long long)e->next_position);
+	}
+	fprintf(stream, "flags:              ");
+	for(i=16; i > 0; --i)
+	{
+		fprintf(stream, "%hhd", GET_BIT(e->flags, i));
+	}
+	fprintf(stream, "\n");
+	for(i=16; i > 0; --i)
+	{
+		if (GET_BIT(e->flags, i))
+			fprintf(stream, "	                    %s\n", ybpi_flags[i-1]);
+	}
+	if (e->data == NULL) {
+		return;
+	}
+	switch ((enum ybp_event_types)e->type_code) {
+		case QUERY_EVENT:
+			{
+			struct ybp_query_event* q = ybp_event_as_qe(e);
+			char* db_name = query_event_db_name(e);
+			size_t statement_len = query_event_statement_len(e);
+			/* Duplicate the statement because the binlog
+			 * doesn't NUL-terminate it. */
+			char* statement;
+			if ((database_limit != NULL) && (strncmp(db_name, database_limit, strlen(database_limit)) != 0))
+				return;
+			if ((statement = strndup((const char*)query_event_statement(e), statement_len)) == NULL) {
+				perror("strndup");
+				return;
+			}
+			fprintf(stream, "thread id:          %d\n", q->thread_id);
+			fprintf(stream, "query time (s):     %d\n", q->query_time);
+			if (q->error_code == 0) {
+				fprintf(stream, "error code:         %d\n", q->error_code);
+			}
+			else {
+				fprintf(stream, "ERROR CODE:         %d\n", q->error_code);
+			}
+			fprintf(stream, "status var length:  %d\n", q->status_var_len);
+			fprintf(stream, "db_name:            %s\n", db_name);
+			if (v_mode) {
+				fprintf(stream, "status var length:  %d\n", q->status_var_len);
+			}
+			if (q->status_var_len > 0) {
+				char* status_var_start = query_event_status_vars(e);
+				char* status_var_ptr = status_var_start;
+				while((status_var_ptr - status_var_start) < q->status_var_len) {
+					enum ybpi_e_status_var_types status_var_type = *status_var_ptr;
+					status_var_ptr++;
+					assert(status_var_type < 10);
+					switch (status_var_type) {
+						case Q_FLAGS2_CODE:
+							{
+							uint32_t val = *((uint32_t*)status_var_ptr);
+							status_var_ptr += 4;
+							fprintf(stream, "Q_FLAGS2:           ");
+							for(i=32; i > 0; --i)
+							{
+								fprintf(stream, "%hhd", GET_BIT(val, i));
+							}
+							fprintf(stream, "\n");
+							for(i=32; i > 0; --i)
+							{
+								if (GET_BIT(val, i))
+									fprintf(stream, "	                    %s\n", ybpi_flags2[i-1]);
+							}
+							break;
+							}
+						case Q_SQL_MODE_CODE:
+							{
+							uint64_t val = *((uint64_t*)status_var_ptr);
+							status_var_ptr += 8;
+							fprintf(stream, "Q_SQL_MODE:         0x%0llu\n", (unsigned long long)val);
+							break;
+							}
+						case Q_CATALOG_CODE:
+							{
+							uint8_t size = *(status_var_ptr++);
+							char* str = strndup(status_var_ptr, size+1);
+							status_var_ptr += size + 1;
+							fprintf(stream, "Q_CATALOG:          %s\n", str);
+							free(str);
+							break;
+							}
+						case Q_AUTO_INCREMENT:
+							{
+							uint16_t byte_1 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							uint16_t byte_2 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							fprintf(stream, "Q_AUTO_INCREMENT:   (%hu,%hu)\n", byte_1, byte_2);
+							break;
+							}
+						case Q_CHARSET_CODE:
+							{
+							uint16_t byte_1 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							uint16_t byte_2 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							uint16_t byte_3 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							fprintf(stream, "Q_CHARSET:          (%hu,%hu,%hu)\n", byte_1, byte_2, byte_3);
+							break;
+							}
+						case Q_TIME_ZONE_CODE:
+							{
+							uint8_t size = *(status_var_ptr++);
+							char* str = strndup(status_var_ptr, size);
+							status_var_ptr += size;
+							fprintf(stream, "Q_TIME_ZONE:        %s\n", str);
+							free(str);
+							break;
+							}
+						case Q_CATALOG_NZ_CODE:
+							{
+							uint8_t size = *(status_var_ptr++);
+							char* str = strndup(status_var_ptr, size);
+							status_var_ptr += size;
+							fprintf(stream, "Q_CATALOG_NZ:       %s\n", str);
+							free(str);
+							break;
+							}
+						case Q_LC_TIME_NAMES_CODE:
+							{
+							uint16_t code = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							fprintf(stream, "Q_LC_TIME_NAMES:    %hu\n", code);
+							break;
+							}
+						case Q_CHARSET_DATABASE_CODE:
+							{
+							uint16_t code = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							fprintf(stream, "Q_CHARSET_DATABASE: %hu\n", code);
+							break;
+							}
+						default:
+							{
+							int incr = ybpi_status_var_data_len_by_type[status_var_type];
+							if (incr > 0) {
+								status_var_ptr += incr;
+							}
+							else if (incr == -1) {
+								uint8_t size = *status_var_ptr;
+								status_var_ptr += size + 1;
+							}
+							else if (incr == -2) {
+								uint8_t size = *status_var_ptr;
+								status_var_ptr += size + 2;
+							}
+							else {
+								assert(0);
+							}
+							fprintf(stream, "	                    %s\n", ybpi_status_var_types[status_var_type]);
+							break;
+							}
+					}
+				}
+			}
+			fprintf(stream, "statement length:   %zd\n", statement_len);
+			if (q_mode == 0)
+				fprintf(stream, "statement:          %s\n", statement);
+			free(statement);
+			}
+			break;
+		case ROTATE_EVENT:
+			{
+			struct ybp_rotate_event *r = (struct ybp_rotate_event*)e->data;
+			char *file_name = strndup((const char*)rotate_event_file_name(e), rotate_event_file_name_len(e));
+			fprintf(stream, "next log position:  %llu\n", (unsigned long long)r->next_position);
+			fprintf(stream, "next file name:     %s\n", file_name);
+			free(file_name);
+			}
+			break;
+		case INTVAR_EVENT:
+			{
+			struct ybp_intvar_event *i = (struct ybp_intvar_event*)e->data;
+			fprintf(stream, "variable type:      %s\n", ybpi_intvar_types[i->type]);
+			fprintf(stream, "value:              %llu\n", (unsigned long long) i->value);
+			}
+			break;
+		case RAND_EVENT:
+			{
+			struct ybp_rand_event *r = (struct ybp_rand_event*)e->data;
+			fprintf(stream, "seed 1:             %llu\n", (unsigned long long) r->seed_1);
+			fprintf(stream, "seed 2:             %llu\n", (unsigned long long) r->seed_2);
+			}
+			break;
+		case FORMAT_DESCRIPTION_EVENT:
+			{
+			struct ybp_format_description_event *f = ybp_event_as_fde(e);
+			fprintf(stream, "binlog version:     %d\n", f->format_version);
+			fprintf(stream, "server version:     %s\n", f->server_version);
+			}
+			break;
+		case XID_EVENT:
+			{
+			struct ybp_xid_event *x = (struct ybp_xid_event*)e->data;
+			fprintf(stream, "xid id:             %llu\n", (unsigned long long)x->id);
+			}
+			break;
+		default:
+			fprintf(stream, "event type:         %s\n", ybp_event_type(e));
+			break;
+	}
 }

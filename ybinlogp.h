@@ -18,13 +18,9 @@
 
 #define EVENT_HEADER_SIZE 19	/* we tack on extra stuff at the end */
 
-struct ybp_binlog_parser;
-struct ybp_event;
-struct ybp_format_description_event;
-struct query_event;
-
 struct ybp_binlog_parser {
 	int			fd;
+	off_t		file_size;
 	ssize_t		offset;
 	bool		enforce_server_id;
 	bool		has_read_fde;
@@ -77,7 +73,6 @@ struct ybp_event {
 	off64_t		offset;
 };
 
-#define ybp_format_description_event_data_len(e) (((struct format_description_event*)e->data)->header_len - EVENT_HEADER_SIZE)
 struct ybp_format_description_event {
 	uint16_t	format_version;	/* ought to be 4 */
 	char		server_version[50];
@@ -86,11 +81,16 @@ struct ybp_format_description_event {
 	// random data
 };
 
-#define query_event_statement(e) (e->data + sizeof(struct query_event) + ((struct query_event*)e->data)->status_var_len + ((struct query_event*)e->data)->db_name_len + 1)
-#define query_event_status_vars(e) (e->data + sizeof(struct query_event))
-#define query_event_statement_len(e) (e->length - EVENT_HEADER_SIZE - sizeof(struct query_event) - ((struct query_event*)e->data)->status_var_len - ((struct query_event*)e->data)->db_name_len - 1)
-#define query_event_db_name(e) (e->data + sizeof(struct query_event) + ((struct query_event*)e->data)->status_var_len)
-struct query_event {
+/**
+ * These macros are horribly unsafe. Only use them of you know EXACTLY what
+ * you are doing. Otherwise, use ybp_query_event_safe_data and
+ * ybp_event_to_qes
+ **/
+#define query_event_statement(e) (e->data + sizeof(struct ybp_query_event) + ((struct ybp_query_event*)e->data)->status_var_len + ((struct ybp_query_event*)e->data)->db_name_len + 1)
+#define query_event_status_vars(e) (e->data + sizeof(struct ybp_query_event))
+#define query_event_statement_len(e) (e->length - EVENT_HEADER_SIZE - sizeof(struct ybp_query_event) - ((struct ybp_query_event*)e->data)->status_var_len - ((struct ybp_query_event*)e->data)->db_name_len - 1)
+#define query_event_db_name(e) (e->data + sizeof(struct ybp_query_event) + ((struct ybp_query_event*)e->data)->status_var_len)
+struct ybp_query_event {
 	uint32_t	thread_id;
 	uint32_t	query_time;
 	uint8_t		db_name_len;
@@ -101,27 +101,54 @@ struct query_event {
 	// statement        (the rest, not NUL)
 };
 
-struct rand_event {
+/**
+ * Use this to safely access the data portions of a query event. Note that
+ * this involves copying things, so it's pretty slow.
+ **/
+struct ybp_query_event_safe {
+	uint32_t	thread_id;
+	uint32_t	query_time;
+	uint8_t		db_name_len;
+	uint16_t	error_code;
+	uint16_t	status_var_len;
+	char*		statement;
+	size_t		statement_len;
+	char*		status_var;
+	char*		db_name;
+};
+
+struct ybp_rotate_event_safe {
+	uint64_t	next_position;
+	char*		file_name;
+	size_t		file_name_len;
+};
+
+struct ybp_rand_event {
 	uint64_t	seed_1;
 	uint64_t	seed_2;
 };
 
-struct xid_event {
+struct ybp_xid_event {
 	uint64_t	id;
 };
 
-struct intvar_event {
+struct ybp_intvar_event {
 	uint8_t		type;
 	uint64_t	value;
 };
 
 #define rotate_event_file_name(e) (e->data + 8)
-#define rotate_event_file_name_len(e) (e->length - EVENT_HEADER_SIZE -8)
-struct rotate_event {
+#define rotate_event_file_name_len(e) ((size_t)(e->length - EVENT_HEADER_SIZE -8))
+struct ybp_rotate_event {
 	uint64_t	next_position;
 	// file name of the next file (not NUL)
 };
 #pragma pack(pop)
+
+enum ybp_search_direction {
+	FORWARDS,
+	BACKWARDS,
+};
 
 /**
  * Initialize a ybp_binlog_parser. Returns 0 on success, non-zero otherwise.
@@ -132,6 +159,14 @@ struct rotate_event {
  *    ybp_binlog_parser
  **/
 int ybp_init_binlog_parser(int, struct ybp_binlog_parser**);
+
+/**
+ * Update the ybp_binlog_parser.
+ *
+ * Call this any time you expect that the underlying file might've changed,
+ * and want to be able to see those changes.
+ **/
+void ybp_update_bp(struct ybp_binlog_parser*);
 
 /**
  * Clean up a ybp_binlog_parser
@@ -171,6 +206,32 @@ void ybp_reset_event(struct ybp_event*);
 void ybp_dispose_event(struct ybp_event*);
 
 /**
+ * Copy an event and attached data from source to dest. Both must already
+ * exist and have been init'd
+ **/
+int ybp_copy_event(struct ybp_event* dest, struct ybp_event* source);
+
+/**
+ * Print event e to the given iostream.
+ *
+ * if the stream is null, print to stdout.
+ **/
+void ybp_print_event_simple(struct ybp_event* restrict, struct ybp_binlog_parser* restrict, FILE* restrict);
+
+/**
+ * Print event e to the given iostream
+ *
+ * Args:
+ *   event
+ *   binlog parser
+ *   iostream
+ *   q_mode
+ *   v_mode
+ *   database restriction
+ **/
+void ybp_print_event(struct ybp_event* restrict, struct ybp_binlog_parser* restrict, FILE* restrict, bool, bool, char*);
+
+/**
  * Get the string type of an event
  **/
 char* ybp_event_type(struct ybp_event*);
@@ -182,6 +243,26 @@ char* ybp_event_type(struct ybp_event*);
  * WARNING: The pointer returned will share memory space with the evbuf
  * argument passed in.
  */
-struct ybp_format_description_event* ybp_event_as_fde(struct ybp_event*);
+struct ybp_format_description_event* ybp_event_as_fde(struct ybp_event* restrict);
+
+/**
+ * Get a safe-to-mess-with query event from an event
+ **/
+struct ybp_query_event_safe* ybp_event_to_safe_qe(struct ybp_event* restrict);
+
+/**
+ * Dispose a structure returned from ybp_event_to_safe_qe
+ **/
+void ybp_dispose_safe_qe(struct ybp_query_event_safe*);
+
+/**
+ * Get a safe-to-mess-with rotate event from an event
+ **/
+struct ybp_rotate_event_safe* ybp_event_to_safe_re(struct ybp_event* restrict);
+
+/**
+ * Dispose a structure returned from ybp_event_to_safe_qe
+ **/
+void ybp_dispose_safe_re(struct ybp_rotate_event_safe*);
 
 #endif /* _YBINLOGP_H_ */

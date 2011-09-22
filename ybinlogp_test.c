@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
 	int fd;
 	struct ybp_binlog_parser* bp;
 	struct ybp_event* evbuf;
-	while ((opt = getopt(argc, argv, "ht:o:a:qQvD:S")) != -1) {
+	while ((opt = getopt(argc, argv, "h")) != -1) {
 		switch (opt) {
 			case 'h':
 				usage();
@@ -53,17 +53,10 @@ int main(int argc, char** argv) {
 	}
 	ybp_init_event(evbuf);
 	while (ybp_next_event(bp, evbuf) >= 0) {
-		switch(evbuf->type_code) {
-			case FORMAT_DESCRIPTION_EVENT:
-				{
-				struct ybp_format_description_event* fde = ybp_event_as_fde(evbuf);
-				time_t buf_time = evbuf->timestamp;
-				printf("FDE:\n");
-				printf("\t%s\t%s\n", ctime(&buf_time), fde->server_version);
-				break;
-				}
-			default:
-				printf("%s\n", ybp_event_type(evbuf));
+		if (evbuf->type_code == QUERY_EVENT) {
+			struct ybp_query_event_safe* s = ybp_event_to_safe_qe(evbuf);
+			printf("%s\n", s->statement);
+			ybp_dispose_safe_qe(s);
 		}
 		ybp_reset_event(evbuf);
 	}
