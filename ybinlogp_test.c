@@ -4,7 +4,9 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "debugs.h"
 #include "ybinlogp.h"
@@ -19,6 +21,8 @@ void usage(void) {
 int main(int argc, char** argv) {
 	int opt;
 	int fd;
+	struct ybp_binlog_parser* bp;
+	struct ybp_event* evbuf;
 	while ((opt = getopt(argc, argv, "ht:o:a:qQvD:S")) != -1) {
 		switch (opt) {
 			case 'h':
@@ -39,11 +43,30 @@ int main(int argc, char** argv) {
 		perror("Error opening file");
 		return 1;
 	}
-	struct binlog_parser* bp;
 	if (ybp_init_binlog_parser(fd, &bp) < 0) {
 		perror("init_binlog_parser");
 		return 1;
 	}
-	while (ybp_next_event(bp) != 0) {
+	if ((evbuf = malloc(sizeof(struct ybp_event))) == NULL) {
+		perror("malloc event");
+		return 1;
 	}
+	ybp_init_event(evbuf);
+	while (ybp_next_event(bp, evbuf) >= 0) {
+		switch(evbuf->type_code) {
+			case FORMAT_DESCRIPTION_EVENT:
+				{
+				struct ybp_format_description_event* fde = ybp_event_as_fde(evbuf);
+				time_t buf_time = evbuf->timestamp;
+				printf("FDE:\n");
+				printf("\t%s\t%s\n", ctime(&buf_time), fde->server_version);
+				break;
+				}
+			default:
+				printf("%s\n", ybp_event_type(evbuf));
+		}
+		ybp_reset_event(evbuf);
+	}
+	ybp_dispose_event(evbuf);
+	ybp_dispose_binlog_parser(bp);
 }

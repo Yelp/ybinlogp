@@ -20,7 +20,7 @@
 
 struct ybp_binlog_parser;
 struct ybp_event;
-struct format_description_event;
+struct ybp_format_description_event;
 struct query_event;
 
 struct ybp_binlog_parser {
@@ -32,6 +32,36 @@ struct ybp_binlog_parser {
 	uint32_t	master_server_id;
 	time_t		min_timestamp;
 	time_t		max_timestamp;
+};
+
+enum ybp_event_types {
+	UNKNOWN_EVENT=0,
+	START_EVENT_V3=1,
+	QUERY_EVENT=2,
+	STOP_EVENT=3,
+	ROTATE_EVENT=4,
+	INTVAR_EVENT=5,
+	LOAD_EVENT=6,
+	SLAVE_EVENT=7,
+	CREATE_FILE_EVENT=8,
+	APPEND_BLOCK_EVENT=9,
+	EXEC_LOAD_EVENT=10,
+	DELETE_FILE_EVENT=11,
+	NEW_LOAD_EVENT=12,
+	RAND_EVENT=13,
+	USER_VAR_EVENT=14,
+	FORMAT_DESCRIPTION_EVENT=15,
+	XID_EVENT=16,
+	BEGIN_LOAD_QUERY_EVENT=17,
+	EXECUTE_LOAD_QUERY_EVENT=18,
+	TABLE_MAP_EVENT=19,
+	PRE_GA_WRITE_ROWS_EVENT=20,
+	PRE_GA_DELETE_ROWS_EVENT=21,
+	WRITE_ROWS_EVENT=22,
+	UPDATE_ROWS_EVENT=23,
+	DELETE_ROWS_EVENT=24,
+	INCIDENT_EVENT=25,
+	HEARTBEAT_LOG_EVENT=26
 };
 
 #pragma pack(push)
@@ -47,9 +77,8 @@ struct ybp_event {
 	off64_t		offset;
 };
 
-#define format_description_event_data(e) (e->data + ((struct format_description_event*)e->data)->header_length)
-#define format_description_event_data_len(e) (((struct format_description_event*)e->data)->header_len - EVENT_HEADER_SIZE)
-struct format_description_event {
+#define ybp_format_description_event_data_len(e) (((struct format_description_event*)e->data)->header_len - EVENT_HEADER_SIZE)
+struct ybp_format_description_event {
 	uint16_t	format_version;	/* ought to be 4 */
 	char		server_version[50];
 	uint32_t	timestamp;
@@ -102,15 +131,24 @@ struct rotate_event {
  *    out: a pointer to a *ybp_binlog_parser. will be filled with a malloced
  *    ybp_binlog_parser
  **/
-int ybp_init_binlog_parser(int fd, struct ybp_binlog_parser** out);
+int ybp_init_binlog_parser(int, struct ybp_binlog_parser**);
+
+/**
+ * Clean up a ybp_binlog_parser
+ **/
+void ybp_dispose_binlog_parser(struct ybp_binlog_parser*);
 
 /**
  * Advance a ybp_binlog_parser structure to the next event.
  *
+ * Arguments:
+ *    p: A binlog_parser
+ *    evbuf: An event buffer (inited with ybp_init_event, or resetted with
+ *    ybp_reset_event) which will be written to
  * Returns 0 if the current event is the last event, <0 on error, and >0
  * otherwise.
  */
-int ybp_next_event(struct ybp_binlog_parser* parser);
+int ybp_next_event(struct ybp_binlog_parser*, struct ybp_event*);
 
 /**
  * Initialize an event object. Event objects must live on the heap
@@ -125,12 +163,25 @@ void ybp_init_event(struct ybp_event*);
  *
  * Deletes the extra data and re-inits the object
  */
-void ybp_reset_event(struct ybp_event *);
+void ybp_reset_event(struct ybp_event*);
 
 /**
  * Destroy an event object and any associated data
  **/
-void ybp_dispose_event(struct ybp_event *);
+void ybp_dispose_event(struct ybp_event*);
 
+/**
+ * Get the string type of an event
+ **/
+char* ybp_event_type(struct ybp_event*);
+
+/**
+ * Interpret an event as an FDE. Returns either a pointer to the FDE, or
+ * NULL.
+ *
+ * WARNING: The pointer returned will share memory space with the evbuf
+ * argument passed in.
+ */
+struct ybp_format_description_event* ybp_event_as_fde(struct ybp_event*);
 
 #endif /* _YBINLOGP_H_ */
