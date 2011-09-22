@@ -10,6 +10,7 @@
 #ifndef _YBINLOGP_H_
 #define _YBINLOGP_H_
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
 
@@ -17,9 +18,25 @@
 
 #define EVENT_HEADER_SIZE 19	/* we tack on extra stuff at the end */
 
+struct ybp_binlog_parser;
+struct ybp_event;
+struct format_description_event;
+struct query_event;
+
+struct ybp_binlog_parser {
+	int			fd;
+	ssize_t		offset;
+	bool		enforce_server_id;
+	bool		has_read_fde;
+	uint32_t	slave_server_id;
+	uint32_t	master_server_id;
+	time_t		min_timestamp;
+	time_t		max_timestamp;
+};
+
 #pragma pack(push)
 #pragma pack(1)			/* force byte alignment */
-struct event {
+struct ybp_event {
 	uint32_t	timestamp;
 	uint8_t		type_code;
 	uint32_t	server_id;
@@ -78,63 +95,42 @@ struct rotate_event {
 #pragma pack(pop)
 
 /**
+ * Initialize a ybp_binlog_parser. Returns 0 on success, non-zero otherwise.
+ *
+ * Arguments:
+ *    fd: A file descriptor open in reading mode to a binlog file
+ *    out: a pointer to a *ybp_binlog_parser. will be filled with a malloced
+ *    ybp_binlog_parser
+ **/
+int ybp_init_binlog_parser(int fd, struct ybp_binlog_parser** out);
+
+/**
+ * Advance a ybp_binlog_parser structure to the next event.
+ *
+ * Returns 0 if the current event is the last event, <0 on error, and >0
+ * otherwise.
+ */
+int ybp_next_event(struct ybp_binlog_parser* parser);
+
+/**
  * Initialize an event object. Event objects must live on the heap
  * and must be destroyed with dispose_event().
  *
  * Just sets everything to 0 for now.
  **/
-void init_event(struct event*);
+void ybp_init_event(struct ybp_event*);
 
 /**
  * Reset an event object, making it re-fillable
  *
  * Deletes the extra data and re-inits the object
  */
-void reset_event(struct event *);
-
-/**
- * Copy an event object, including any extra data
- */
-int copy_event(struct event *, struct event *);
+void ybp_reset_event(struct ybp_event *);
 
 /**
  * Destroy an event object and any associated data
  **/
-void dispose_event(struct event *);
+void ybp_dispose_event(struct ybp_event *);
 
-/**
- * Print out only statement events, and only the statement
- **/
-void print_statement_event(struct event *e);
-
-/**
- * Print out an event
- **/
-void print_event(struct event *e);
-
-/**
- * Read an event from the specified offset into the given event buffer.
- *
- * Will also malloc() space for any dynamic portions of the event, if the 
- * event passes check_event.
- **/
-int read_event(int, struct event *, off64_t);
-
-/**
- * Check to see if an event looks valid.
- **/
-int check_event(struct event *);
-
-/**
- * Find the offset of the next event after the one passed in.
- * Uses the built-in event chaining.
- *
- * Usage:
- *  struct event *next;
- *  struct event *evbuf = ...
- *  off_t next_offset = next_after(evbuf);
- *  read_event(fd, next, next_offset);
- **/
-off64_t next_after(struct event *evbuf);
 
 #endif /* _YBINLOGP_H_ */
