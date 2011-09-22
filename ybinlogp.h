@@ -101,27 +101,6 @@ struct ybp_query_event {
 	// statement        (the rest, not NUL)
 };
 
-/**
- * Use this to safely access the data portions of a query event. Note that
- * this involves copying things, so it's pretty slow.
- **/
-struct ybp_query_event_safe {
-	uint32_t	thread_id;
-	uint32_t	query_time;
-	uint8_t		db_name_len;
-	uint16_t	error_code;
-	uint16_t	status_var_len;
-	char*		statement;
-	size_t		statement_len;
-	char*		status_var;
-	char*		db_name;
-};
-
-struct ybp_rotate_event_safe {
-	uint64_t	next_position;
-	char*		file_name;
-	size_t		file_name_len;
-};
 
 struct ybp_rand_event {
 	uint64_t	seed_1;
@@ -145,6 +124,28 @@ struct ybp_rotate_event {
 };
 #pragma pack(pop)
 
+/**
+ * Use this to safely access the data portions of a query event. Note that
+ * this involves copying things, so it's pretty slow.
+ **/
+struct ybp_query_event_safe {
+	uint32_t	thread_id;
+	uint32_t	query_time;
+	uint8_t		db_name_len;
+	uint16_t	error_code;
+	uint16_t	status_var_len;
+	char*		statement;
+	size_t		statement_len;
+	char*		status_var;
+	char*		db_name;
+};
+
+struct ybp_rotate_event_safe {
+	uint64_t	next_position;
+	char*		file_name;
+	size_t		file_name_len;
+};
+
 enum ybp_search_direction {
 	FORWARDS,
 	BACKWARDS,
@@ -155,13 +156,19 @@ enum ybp_search_direction {
  *
  * Arguments:
  *    fd: A file descriptor open in reading mode to a binlog file
- *    out: a pointer to a *ybp_binlog_parser. will be filled with a malloced
- *    ybp_binlog_parser
  **/
-int ybp_init_binlog_parser(int, struct ybp_binlog_parser**);
+struct ybp_binlog_parser* ybp_get_binlog_parser(int);
 
 /**
  * Update the ybp_binlog_parser.
+ *
+ * Call this any time you expect that the underlying file might've changed,
+ * and want to be able to see those changes.
+ **/
+void ybp_update_bp(struct ybp_binlog_parser*);
+
+/**
+ * Rewind the ybp_binlog_parser to the given offset
  *
  * Call this any time you expect that the underlying file might've changed,
  * and want to be able to see those changes.
@@ -192,6 +199,12 @@ int ybp_next_event(struct ybp_binlog_parser*, struct ybp_event*);
  * Just sets everything to 0 for now.
  **/
 void ybp_init_event(struct ybp_event*);
+
+/**
+ * Get a clean event object. Like ybp_init_event, but it does the malloc for
+ * you.
+ **/
+struct ybp_event* ybp_get_event(void);
 
 /**
  * Reset an event object, making it re-fillable
@@ -265,4 +278,13 @@ struct ybp_rotate_event_safe* ybp_event_to_safe_re(struct ybp_event* restrict);
  **/
 void ybp_dispose_safe_re(struct ybp_rotate_event_safe*);
 
+/**
+ * Get a safe-to-mess-with xid event from an event
+ **/
+struct ybp_xid_event* ybp_event_to_safe_xe(struct ybp_event* restrict);
+
+/**
+ * Dispose a structure returned from ybp_event_to_safe_xe
+ **/
+void ybp_dispose_safe_xe(struct ybp_xid_event*);
 #endif /* _YBINLOGP_H_ */

@@ -191,14 +191,11 @@ static off64_t ybpi_next_after(struct ybp_event* restrict);
 
 /******** implementation begins here ********/
 
-int ybp_init_binlog_parser(int fd, struct ybp_binlog_parser** restrict out)
+struct ybp_binlog_parser* ybp_get_binlog_parser(int fd)
 {
 	struct ybp_binlog_parser* result;
 	if ((result = malloc(sizeof(struct ybp_binlog_parser))) == NULL) {
-		return -1;
-	}
-	if ((out == NULL) || (out == NULL)) {
-		return -1;
+		return NULL;
 	}
 	result->fd = fd;
 	result->offset = 4;
@@ -209,8 +206,12 @@ int ybp_init_binlog_parser(int fd, struct ybp_binlog_parser** restrict out)
 	result->max_timestamp = time(NULL);
 	result->has_read_fde = false;
 	ybp_update_bp(result);
-	*out = result;
-	return 0;
+	return result;
+}
+
+void ybp_rewind_bp(struct ybp_binlog_parser* p, off_t offset)
+{
+	p->offset = offset;
 }
 
 void ybp_update_bp(struct ybp_binlog_parser* p)
@@ -226,8 +227,16 @@ void ybp_dispose_binlog_parser(struct ybp_binlog_parser* p)
 		free(p);
 }
 
-void ybp_init_event(struct ybp_event* evbuf) {
+void ybp_init_event(struct ybp_event* evbuf)
+{
 	memset(evbuf, 0, sizeof(struct ybp_event*));
+}
+
+struct ybp_event* ybp_get_event(void)
+{
+	struct ybp_event* event = malloc(sizeof(struct ybp_event));
+	ybp_init_event(event);
+	return event;
 }
 
 void ybp_dispose_event(struct ybp_event* evbuf)
@@ -243,7 +252,7 @@ void ybp_dispose_event(struct ybp_event* evbuf)
 
 int ybp_copy_event(struct ybp_event *dest, struct ybp_event *source)
 {
-	Dprintf("About to copy 0x%p to 0x%p\n", source, dest);
+	Dprintf("About to copy 0x%p to 0x%p\n", (void*)source, (void*)dest);
 	memmove(dest, source, sizeof(struct ybp_event));
 	if (source->data != 0) {
 		Dprintf("mallocing %d bytes for the target\n", source->length - EVENT_HEADER_SIZE);
@@ -311,7 +320,7 @@ off64_t ybp_nearest_offset(struct ybp_binlog_parser* p, off64_t starting_offset,
 	struct ybp_event *evbuf = malloc(sizeof(struct ybp_event));
 	ybp_init_event(evbuf);
 	offset = starting_offset;
-	Dprintf("In nearest offset mode, got fd=%d, starting_offset=%llu\n", fd, (long long)starting_offset);
+	Dprintf("In nearest offset mode, got fd=%d, starting_offset=%llu\n", p->fd, (long long)starting_offset);
 	while (num_increments < MAX_RETRIES && offset >= 0 && offset <= p->file_size - EVENT_HEADER_SIZE) 
 	{
 		ybp_reset_event(evbuf);
@@ -354,6 +363,7 @@ static int ybpi_read_event(struct ybp_binlog_parser* p, off_t offset, struct ybp
 		fprintf(stderr, "Error reading event at %lld: %s\n", (long long) offset, strerror(errno));
 		return -1;
 	} else if ((size_t)amt_read != EVENT_HEADER_SIZE) {
+		Dprintf("read %zd bytes, expected to read %d bytes in ybpi_read_event", amt_read, EVENT_HEADER_SIZE);
 		return -1;
 	}
 	if (ybpi_check_event(evbuf, p)) {
@@ -415,18 +425,20 @@ static int ybpi_read_fde(struct ybp_binlog_parser* p)
 
 int ybp_next_event(struct ybp_binlog_parser* parser, struct ybp_event* evbuf)
 {
-	off64_t offset = 4;
 	int ret = 0;
 	if (!parser->has_read_fde) {
 		ybpi_read_fde(parser);
-		return ybpi_read_event(parser, offset, evbuf);
 	}
 	ret = ybpi_read_event(parser, parser->offset, evbuf);
 	if (ret < 0) { 
+		Dprintf("error in ybp_next_event: %d\n", ret);
 		return ret;
 	} else {
 		parser->offset = ybpi_next_after(evbuf);
-		if ((parser->offset <= 0) || (evbuf->next_position == evbuf->offset)) {
+		if ((parser->offset <= 0) || (evbuf->next_position == evbuf->offset) ||
+			(evbuf->next_position >= parser->file_size) ||
+			(parser->offset >= parser->file_size)) {
+			Dprintf("Got to last event");
 			return 0;
 		} else {
 			return 1;
@@ -462,7 +474,9 @@ struct ybp_query_event_safe* ybp_event_to_safe_qe(struct ybp_event* restrict e) 
 		return NULL;
 	} else {
 		struct ybp_query_event* qe = (struct ybp_query_event*)(e->data);
+		Dprintf("Constructing safe query event for 0x%p\n", (void*) e);
 		s = malloc(sizeof(struct ybp_query_event_safe));
+		Dprintf("malloced 0x%p\n", (void*)s);
 		s->thread_id = qe->thread_id;
 		s->query_time = qe->query_time;
 		s->db_name_len = qe->db_name_len;
@@ -474,6 +488,8 @@ struct ybp_query_event_safe* ybp_event_to_safe_qe(struct ybp_event* restrict e) 
 		}
 		s->statement_len = query_event_statement_len(e);
 		s->statement = strndup((const char*)query_event_statement(e), s->statement_len);
+		Dprintf("s->statement_len = %zd\n", s->statement_len);
+		Dprintf("s->statement = %s\n", s->statement);
 		if (s->statement == NULL) {
 			perror("strndup");
 			return NULL;
@@ -481,6 +497,7 @@ struct ybp_query_event_safe* ybp_event_to_safe_qe(struct ybp_event* restrict e) 
 		s->db_name = strndup((char*)query_event_db_name(e), s->db_name_len);
 		s->status_var = strndup((char*)query_event_status_vars(e), s->status_var_len);
 	}
+	Dprintf("Returning s\n");
 	return s;
 }
 
@@ -491,6 +508,21 @@ void ybp_dispose_safe_qe(struct ybp_query_event_safe* s)
 	}
 	if (s->statement != NULL)
 		free(s->statement);
+	if (s->db_name != NULL)
+		free(s->db_name);
+	if (s->status_var != NULL)
+		free(s->status_var);
+	free(s);
+}
+
+void ybp_dispose_safe_re(struct ybp_rotate_event_safe* s)
+{
+	if (s == NULL) {
+		return;
+	}
+	if (s->file_name != NULL)
+		free(s->file_name);
+	free(s);
 }
 
 struct ybp_rotate_event_safe* ybp_event_to_safe_re(struct ybp_event* restrict e) {
@@ -507,8 +539,27 @@ struct ybp_rotate_event_safe* ybp_event_to_safe_re(struct ybp_event* restrict e)
 	return s;
 }
 
+struct ybp_xid_event* ybp_event_to_safe_xe(struct ybp_event* restrict e) {
+	struct ybp_xid_event* s;
+	if (e->type_code != XID_EVENT) {
+		fprintf(stderr, "Illegal conversion attempted: %d -> %d\n", e->type_code, ROTATE_EVENT);
+	} else {
+		struct ybp_xid_event* xe = (struct ybp_xid_event*)(e->data);
+		s = malloc(sizeof(struct ybp_xid_event));
+		if (s == NULL)
+			return NULL;
+		memcpy(s, xe, sizeof(struct ybp_xid_event));
+	}
+	return s;
+}
+
+void ybp_dispose_safe_xe(struct ybp_xid_event* xe)
+{
+	free(xe);
+}
+
 char* ybp_event_type(struct ybp_event* restrict evbuf) {
-	Dprintf("Looking up type string for %d", evbuf->type_code);
+	Dprintf("Looking up type string for %d\n", evbuf->type_code);
 	return ybpi_event_types[evbuf->type_code];
 }
 

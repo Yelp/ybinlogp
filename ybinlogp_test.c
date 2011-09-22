@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
 		perror("Error opening file");
 		return 1;
 	}
-	if (ybp_init_binlog_parser(fd, &bp) < 0) {
+	if ((bp = ybp_get_binlog_parser(fd)) == NULL) {
 		perror("init_binlog_parser");
 		return 1;
 	}
@@ -57,6 +57,16 @@ int main(int argc, char** argv) {
 			struct ybp_query_event_safe* s = ybp_event_to_safe_qe(evbuf);
 			printf("%s\n", s->statement);
 			ybp_dispose_safe_qe(s);
+		}
+		else if (evbuf->type_code == ROTATE_EVENT) {
+			struct ybp_rotate_event_safe* s = ybp_event_to_safe_re(evbuf);
+			printf("%s.%llu\n", s->file_name, (long long unsigned)s->next_position);
+			ybp_dispose_safe_re(s);
+		}
+		else if (evbuf->type_code == XID_EVENT) {
+			struct ybp_xid_event* s = ybp_event_to_safe_xe(evbuf);
+			printf("%llu\n", (long long unsigned)s->id);
+			ybp_dispose_safe_xe(s);
 		}
 		ybp_reset_event(evbuf);
 	}
