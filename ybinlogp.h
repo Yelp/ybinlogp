@@ -1,7 +1,7 @@
 /*
  * binlogp: A mysql binary log parser and query tool
  *
- * (C) 2010 Yelp, Inc.
+ * (C) 2010-2011 Yelp, Inc.
  *
  * This work is licensed under the ISC/OpenBSD License. The full
  * contents of that license can be found under license.txt
