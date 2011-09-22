@@ -1,8 +1,10 @@
 ybinlogp - a fast mysql binlog parsing utility
 ==============================================
-**ybinlogp** is a mysql utility for analyzing mysql binlogs. It currently
-only has a command-line interface; there might at some point in the future
-be a working Python interface.
+**ybinlogp** is a mysql utility for analyzing mysql binlogs. It provides a library,
+libybinlogp, which has a really terrible build system, a little tool documented
+below which uses this library, and a python-ctypes wrapper that exposes some
+critical functionality (namely, opening a binlog, reading from it, and handling
+query, xid, and rotate events).
 
 Usage
 -----
@@ -13,13 +15,9 @@ Options:
  *  `-o OFFSET          Find events after a given offset`
  *  `-t TIME            Find events after a given unix timestamp`
  *  `-a NUMBER          Print N events after the given one (accepts 'all')`
- *  `-Q                 Only print query statements`
- *  `-QQ                Only print query statements, without transaction indicators`
  *  `-D DBNAME          Filter out query statements not on database DBNAME`
- *  `-S                 Skip the server-id checks, which might not work with some replication hierarchies`
- *  `-h                 Show help`
  *  `-q                 Be quieter (may be specified multiple times)`
- *  `-v                 Be more verbose`
+ *  `-h                 Show help`
 
 
 Why?
