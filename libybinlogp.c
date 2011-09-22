@@ -238,7 +238,7 @@ void ybp_init_event(struct ybp_event* evbuf)
 struct ybp_event* ybp_get_event(void)
 {
 	struct ybp_event* event = malloc(sizeof(struct ybp_event));
-	Dprintf("Creating event at 0x%p\n", event);
+	Dprintf("Creating event at 0x%p\n", (void*)event);
 	ybp_init_event(event);
 	return event;
 }
@@ -501,7 +501,7 @@ int ybp_next_event(struct ybp_binlog_parser* parser, struct ybp_event* evbuf)
 		if ((parser->offset <= 0) || (evbuf->next_position == evbuf->offset) ||
 			(evbuf->next_position >= parser->file_size) ||
 			(parser->offset >= parser->file_size)) {
-			Dprintf("Got to last event, parser->offset=%zd, evbuf->next_position=%zd, parser->file_size=%zd\n", 
+			Dprintf("Got to last event, parser->offset=%zd, evbuf->next_position=%u, parser->file_size=%zd\n", 
 					parser->offset,
 					evbuf->next_position,
 					parser->file_size);
@@ -548,6 +548,7 @@ struct ybp_query_event_safe* ybp_event_to_safe_qe(struct ybp_event* restrict e) 
 		s->thread_id = qe->thread_id;
 		s->query_time = qe->query_time;
 		s->db_name_len = qe->db_name_len;
+		Dprintf("qe->db_name_len = %d\n", qe->db_name_len);
 		s->error_code = qe->error_code;
 		s->status_var_len = qe->status_var_len;
 		if (s == NULL) {
