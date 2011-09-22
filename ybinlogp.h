@@ -163,6 +163,11 @@ struct ybp_binlog_parser* ybp_get_binlog_parser(int);
 void ybp_update_bp(struct ybp_binlog_parser*);
 
 /**
+ * Get the offset in the bp
+ **/
+off64_t ybp_tell_bp(struct ybp_binlog_parser*);
+
+/**
  * Rewind the ybp_binlog_parser to the given offset
  *
  * Call this any time you expect that the underlying file might've changed,

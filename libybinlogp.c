@@ -217,6 +217,11 @@ void ybp_rewind_bp(struct ybp_binlog_parser* p, off_t offset)
 	p->offset = offset;
 }
 
+off64_t ybp_tell_bp(struct ybp_binlog_parser* p)
+{
+	return p->offset;
+}
+
 void ybp_update_bp(struct ybp_binlog_parser* p)
 {
 	struct stat stbuf;

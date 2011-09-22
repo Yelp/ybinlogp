@@ -28,8 +28,9 @@ class EventStruct(ctypes.Structure):
 
 class Event(object):
 	"""User-facing data structure for Events"""
-	def __init__(self, event_type, timestamp):
+	def __init__(self, event_type, offset, timestamp):
 		self.event_type = event_type
+		self.offset = offset
 		self.time = datetime.datetime.fromtimestamp(timestamp)
 		self.data = None
 
@@ -141,13 +142,17 @@ _dispose_safe_xe = library.ybp_dispose_safe_xe
 _dispose_safe_xe.argtype = [ctypes.POINTER(XIDEventStruct)]
 _dispose_safe_xe.restype = None
 
-# no c_off in ctypes, using c_ulong instead
+# no c_off in ctypes, using c_longlong instead
 _rewind_bp = library.ybp_rewind_bp
-_rewind_bp.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+_rewind_bp.argtypes = [ctypes.c_void_p, ctypes.c_longlong]
 _rewind_bp.restype = None
 
+_tell_bp = library.ybp_tell_bp
+_tell_bp.argtypes = [ctypes.c_void_p]
+_tell_bp.restype = ctypes.c_longlong
+
 _nearest_offset = library.ybp_nearest_offset
-_nearest_offset.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+_nearest_offset.argtypes = [ctypes.c_void_p, ctypes.c_longlong]
 _nearest_offset.restype = ctypes.c_longlong
 
 _nearest_time = library.ybp_nearest_time
@@ -196,8 +201,8 @@ class YBinlogP(object):
 				interesting
 		"""
 		self.filename = filename
-		self.file = open(filename, 'r')
-		self.binlog_parser_handle = _init_bp(self.file.fileno())
+		self._file = open(self.filename, 'r')
+		self.binlog_parser_handle = _init_bp(self._file.fileno())
 		self.event_buffer = _get_event();
 		self.always_update = always_update
 
@@ -206,7 +211,7 @@ class YBinlogP(object):
 		if last < 0:
 			raise NextEventError(ctypes.get_errno())
 		et = _event_type(self.event_buffer)
-		base_event = Event(et, self.event_buffer.contents.timestamp)
+		base_event = Event(et, self.event_buffer.contents.offset, self.event_buffer.contents.timestamp)
 		print "Got %s" % base_event
 		if et == "QUERY_EVENT":
 			query_event = _event_to_safe_qe(self.event_buffer)
@@ -233,6 +238,10 @@ class YBinlogP(object):
 		self.binlog_parser_handle = None
 		_dispose_event(self.event_buffer)
 		self.event_buffer = None
+		self._file.close()
+
+	def tell(self):
+		return (self.filename, _tell_bp(self.binlog_parser_handle))
 
 	def update(self):
 		"""Update the binlog parser. This just re-stats the underlying file descriptor.
@@ -244,8 +253,14 @@ class YBinlogP(object):
 		last = False
 		while not last:
 			if self.always_update:
-				bp.update()
-			(event, last) = self._get_next_event()
+				self.update()
+			try:
+				(event, last) = self._get_next_event()
+			except NextEventError, e:
+				if e.errno == 0:
+					return
+				else:
+					raise
 			yield event
 
 	def rewind(self, offset):
@@ -285,11 +300,3 @@ class YBinlogP(object):
 			raise NoEventsAfterOffset()
 		else:
 			return offset
-
-
-if __name__ == '__main__':
-	import sys
-	bp = YBinlogP(sys.argv[1], always_update=True)
-	for i,event in enumerate(bp):
-		print event
-	bp.clean_up()
