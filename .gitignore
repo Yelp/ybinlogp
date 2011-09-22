@@ -4,3 +4,4 @@ mysql-bin*
 *.o
 *.so
 *.so.*
+*.pyc

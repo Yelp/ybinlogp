@@ -21,9 +21,6 @@ libybinlogp.so.1: libybinlogp.o
 libybinlogp.o: libybinlogp.c
 	gcc $(CFLAGS) $(LDFLAGS) -c -fPIC -o $@ $^
 
-#install: all
-#	install -m 755 -o root -g root ybinlogp $(prefix)/sbin/ybinlogp
-
 clean::
 	rm -f $(TARGETS) *.o
 

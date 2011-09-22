@@ -41,7 +41,7 @@
 /******* more defines ********/
 #define MAX_RETRIES	16*1048576  /* how many bytes to seek ahead looking for a record */
 
-#define GET_BIT(x,bit) (!!(x & 1 << (bit-1)))
+#define GET_BIT(x,bit) (unsigned char)(!!(x & 1 << (bit-1)))
 
 /******* various mappings ********/
 static char* ybpi_event_types[27] = {
@@ -74,6 +74,7 @@ static char* ybpi_event_types[27] = {
 	"HEARTBEAT_LOG_EVENT"	    // 26
 };
 
+/*
 static char* ybpi_variable_types[10] = {
 	"Q_FLAGS2_CODE",               // 0
 	"Q_SQL_MODE_CODE",             // 1
@@ -86,6 +87,7 @@ static char* ybpi_variable_types[10] = {
 	"Q_CHARSET_DATABASE_CODE",     // 8
 	"Q_TABLE_MAP_FOR_UPDATE_CODE", // 9
 };
+*/
 
 static char* ybpi_intvar_types[3] = {
 	"",
