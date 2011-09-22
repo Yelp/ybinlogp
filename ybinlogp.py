@@ -1,3 +1,12 @@
+"""
+ ybinlogp: A mysql binary log parser and query tool
+
+ (C) 2010-2011 Yelp, Inc.
+
+ This work is licensed under the ISC/OpenBSD License. The full
+ contents of that license can be found under license.txt
+"""
+
 import ctypes
 import datetime
 import errno
@@ -5,6 +14,7 @@ import errno
 library = ctypes.CDLL("libybinlogp.so.1", use_errno=True)
 
 class EventStruct(ctypes.Structure):
+	"""Internal data structure for Events"""
 	_fields_ = [("timestamp", ctypes.c_uint32),
 			("type_code", ctypes.c_uint8),
 			("server_id", ctypes.c_uint32),
@@ -17,6 +27,7 @@ class EventStruct(ctypes.Structure):
 	_pack_ = 1
 
 class Event(object):
+	"""User-facing data structure for Events"""
 	def __init__(self, event_type, timestamp):
 		self.event_type = event_type
 		self.time = datetime.datetime.fromtimestamp(timestamp)
@@ -26,6 +37,7 @@ class Event(object):
 		return "%s at %s%s" % (self.event_type, self.time, ": " + str(self.data) if self.data is not None else "")
 
 class QueryEventStruct(ctypes.Structure):
+	"""Internal data structure for query events"""
 	_fields_ = [("thread_id", ctypes.c_uint32),
 			("query_time", ctypes.c_uint32),
 			("db_name_len", ctypes.c_uint8),
@@ -37,6 +49,7 @@ class QueryEventStruct(ctypes.Structure):
 			("db_name", ctypes.c_char_p)]
 
 class QueryEvent(object):
+	"""User-facing data structure for query events"""
 	def __init__(self, db_name, statement, query_time):
 		self.db_name = db_name
 		self.statement = statement
@@ -46,11 +59,13 @@ class QueryEvent(object):
 		return "Query(db='%s', statement='%s', query_time=%d)" % (self.db_name, self.statement, self.query_time)
 
 class RotateEventStruct(ctypes.Structure):
+	"""Internal data structure for rotatation events"""
 	_fields_ = [("next_position", ctypes.c_uint64),
 			("file_name", ctypes.c_char_p),
 			("file_name_len", ctypes.c_size_t)]
 
 class RotateEvent(object):
+	"""User-facing data structure for rotatation events"""
 	def __init__(self, next_position, file_name):
 		self.next_position = next_position
 		self.file_name = file_name
@@ -59,9 +74,11 @@ class RotateEvent(object):
 		return "Rotate(next file=%s, next_position=%d)" % (self.file_name, self.next_position)
 
 class XIDEventStruct(ctypes.Structure):
+	"""Internal data structure for XID events"""
 	_fields_ = [("id", ctypes.c_uint64)]
 
 class XIDEvent(object):
+	"""User-facing data structure for XID events, which seem to all represent COMMITs"""
 	def __init__(self, xid):
 		self.xid = xid
 
@@ -124,11 +141,23 @@ _dispose_safe_xe = library.ybp_dispose_safe_xe
 _dispose_safe_xe.argtype = [ctypes.POINTER(XIDEventStruct)]
 _dispose_safe_xe.restype = None
 
+# no c_off in ctypes, using c_ulong instead
 _rewind_bp = library.ybp_rewind_bp
 _rewind_bp.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
 _rewind_bp.restype = None
 
+_nearest_offset = library.ybp_nearest_offset
+_nearest_offset.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+_nearest_offset.restype = ctypes.c_longlong
+
+_nearest_time = library.ybp_nearest_time
+_nearest_time.argtypes = [ctypes.c_void_p, ctypes.c_long]
+_nearest_time.restype = ctypes.c_longlong
+
 class YBinlogPError(Exception):
+	pass
+
+class YBinlogPSysError(YBinlogPError):
 	def __init__(self, errno):
 		self.errno = errno
 
@@ -138,10 +167,26 @@ class YBinlogPError(Exception):
 	def __str__(self):
 		return repr(self)
 
-class NextEventError(YBinlogPError):
+class NextEventError(YBinlogPSysError):
+	pass
+
+class NoEventsAfterTime(YBinlogPError):
+	pass
+
+class NoEventsAfterOffset(YBinlogPError):
 	pass
 
 class YBinlogP(object):
+	"""Python interface to ybinlogp, the fast mysql binlog parser.
+
+	Example usage:
+
+	bp = YBinlogP('/path/to/binlog/file')
+	for query in bp:
+		if event.event_type == "QUERY_EVENT":
+		    print event.data.statement
+	bp.clean_up()
+	"""
 	def __init__(self, filename, always_update=False):
 		"""Construct a YBinlogP.
 
@@ -160,9 +205,9 @@ class YBinlogP(object):
 		last = _next_event(self.binlog_parser_handle, self.event_buffer)
 		if last < 0:
 			raise NextEventError(ctypes.get_errno())
-		event = None
 		et = _event_type(self.event_buffer)
 		base_event = Event(et, self.event_buffer.contents.timestamp)
+		print "Got %s" % base_event
 		if et == "QUERY_EVENT":
 			query_event = _event_to_safe_qe(self.event_buffer)
 			base_event.data = QueryEvent(query_event.contents.db_name, query_event.contents.statement, query_event.contents.query_time)
@@ -177,36 +222,74 @@ class YBinlogP(object):
 			xid_event = _event_to_safe_xe(self.event_buffer)
 			base_event.data = XIDEvent(xid_event.contents.id)
 			_dispose_safe_xe(xid_event)
+
 		return (base_event, last == 0)
 
 	def clean_up(self):
 		"""Clean up some things that are allocated in C-land. Attempting to
 		use this object after calling this method will break."""
+		# TODO: should this be a __del__?
 		_dispose_bp(self.binlog_parser_handle)
 		self.binlog_parser_handle = None
 		_dispose_event(self.event_buffer)
 		self.event_buffer = None
 
 	def update(self):
+		"""Update the binlog parser. This just re-stats the underlying file descriptor.
+		Call this if you have reason to believe that the underlying file has changed size
+		(or set always_update to be true on the Python wrapper object)."""
 		_update_bp(self.binlog_parser_handle)
 
 	def __iter__(self):
-		while True:
+		last = False
+		while not last:
 			if self.always_update:
 				bp.update()
 			(event, last) = self._get_next_event()
 			yield event
-			if last:
-				raise StopIteration
 
 	def rewind(self, offset):
 		"""Reset this bp to point to the beginning of the file"""
 		_rewind_bp(self.binlog_parser_handle, offset)
 
+	def first_offset_after_time(self, t):
+		"""Find the first offset after the given unix timestamp. Usage:
+
+		bp = YBinlogP('/path/to/binlog')
+		offset = bp.first_offset_after_time(1293868800) # jan 1 2011
+		bp.rewind(offset)
+		for record in bp:
+		    # ...
+		"""
+		offset = _nearest_time(self.binlog_parser_handle, t)
+		if offset == -1:
+			raise NextEventError(ctypes.get_errno())
+		elif offset == -2:
+			raise NoEventsAfterTime()
+		else:
+			return offset
+
+	def first_offset_after_offset(self, t):
+		"""Find the first valid offset after the given offset. Usage:
+
+		bp = YBinlogP('/path/to/binlog')
+		offset = bp.first_offset_after_offset(1048576) # skip the first 1 MB
+		bp.rewind(offset)
+		for record in bp:
+		    # ...
+		"""
+		offset = _nearest_offset(self.binlog_parser_handle, t)
+		if offset == -1:
+			raise NextEventError(ctypes.get_errno())
+		elif offset == -2:
+			raise NoEventsAfterOffset()
+		else:
+			return offset
+
+
 if __name__ == '__main__':
-	bp = YBinlogP("mysql-bin.000017")
+	import sys
+	bp = YBinlogP(sys.argv[1], always_update=True)
 	for i,event in enumerate(bp):
-		if i >= 10000:
-			break
 		print event
 	bp.clean_up()
