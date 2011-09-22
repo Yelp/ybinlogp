@@ -1,3 +1,10 @@
+0.5.0
+-----
+Big update!
+* Adds python bindings with ctypes!
+* Refactors into a library!
+* A new and differently-terrible Makefile!
+
 0.3.1
 -----
 * Bump NEWS.md
