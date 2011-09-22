@@ -15,7 +15,8 @@ void usage(void) {
 	fprintf(stderr, "ybinlogp_test [options] binlog\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Options\n");
-	fprintf(stderr, "  -h       show this help\n");
+	fprintf(stderr, "\t-h           show this help\n");
+	fprintf(stderr, "\t-o OFFSET    find the first event after the given offset\n");
 }
 
 int main(int argc, char** argv) {
@@ -23,11 +24,15 @@ int main(int argc, char** argv) {
 	int fd;
 	struct ybp_binlog_parser* bp;
 	struct ybp_event* evbuf;
-	while ((opt = getopt(argc, argv, "h")) != -1) {
+	long starting_offset = -1;
+	while ((opt = getopt(argc, argv, "ho:")) != -1) {
 		switch (opt) {
 			case 'h':
 				usage();
 				return 0;
+			case 'o':      /* Offset mode */
+				starting_offset = atoll(optarg);
+				break;
 			case '?':
 				fprintf(stderr, "Unknown argument %c\n", optopt);
 				usage();
@@ -52,6 +57,21 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 	ybp_init_event(evbuf);
+	if (starting_offset >= 0) {
+		off64_t offset = ybp_nearest_offset(bp, starting_offset, FORWARDS);
+		if (offset == -2) {
+			fprintf(stderr, "Unable to find anything after offset %ld\n", starting_offset);
+			return 1;
+		}
+		else if (offset == -1) {
+			perror("nearest_offset");
+			return 1;
+		}
+		else {
+			ybp_rewind_bp(bp, offset);
+		}
+	}
+	int i = 0;
 	while (ybp_next_event(bp, evbuf) >= 0) {
 		if (evbuf->type_code == QUERY_EVENT) {
 			struct ybp_query_event_safe* s = ybp_event_to_safe_qe(evbuf);
@@ -65,10 +85,14 @@ int main(int argc, char** argv) {
 		}
 		else if (evbuf->type_code == XID_EVENT) {
 			struct ybp_xid_event* s = ybp_event_to_safe_xe(evbuf);
-			printf("%llu\n", (long long unsigned)s->id);
+			printf("XID %llu\n", (long long unsigned)s->id);
 			ybp_dispose_safe_xe(s);
 		}
+		else {
+			printf("%d\n", ybp_event_type(evbuf));
+		}
 		ybp_reset_event(evbuf);
+		i+=1;
 	}
 	ybp_dispose_event(evbuf);
 	ybp_dispose_binlog_parser(bp);

@@ -173,7 +173,7 @@ void ybp_update_bp(struct ybp_binlog_parser*);
  * Call this any time you expect that the underlying file might've changed,
  * and want to be able to see those changes.
  **/
-void ybp_update_bp(struct ybp_binlog_parser*);
+void ybp_rewind_bp(struct ybp_binlog_parser*, off_t);
 
 /**
  * Clean up a ybp_binlog_parser
@@ -287,4 +287,9 @@ struct ybp_xid_event* ybp_event_to_safe_xe(struct ybp_event* restrict);
  * Dispose a structure returned from ybp_event_to_safe_xe
  **/
 void ybp_dispose_safe_xe(struct ybp_xid_event*);
+
+/**
+ * Search tools!
+ **/
+off64_t ybp_nearest_offset(struct ybp_binlog_parser*, off64_t, enum ybp_search_direction);
 #endif /* _YBINLOGP_H_ */

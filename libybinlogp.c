@@ -36,6 +36,7 @@
 #define MIN_EVENT_LENGTH 19
 #define MAX_EVENT_LENGTH 16*1048576  // Max statement len is generally 16MB
 #define MAX_SERVER_ID 4294967295   // 0 <= server_id  <= 2**32
+#define TIMESTAMP_FUDGE_FACTOR 3600
 
 /******* more defines ********/
 #define MAX_RETRIES	16*1048576  /* how many bytes to seek ahead looking for a record */
@@ -206,6 +207,7 @@ struct ybp_binlog_parser* ybp_get_binlog_parser(int fd)
 	result->max_timestamp = time(NULL);
 	result->has_read_fde = false;
 	ybp_update_bp(result);
+	ybpi_read_fde(result);
 	return result;
 }
 
@@ -313,15 +315,21 @@ static off64_t ybpi_next_after(struct ybp_event *evbuf) {
  *
  * If evbuf is non-null, copy it into there
  */
-off64_t ybp_nearest_offset(struct ybp_binlog_parser* p, off64_t starting_offset, struct ybp_event *outbuf, enum ybp_search_direction direction)
+off64_t ybp_nearest_offset(struct ybp_binlog_parser* p, off64_t starting_offset, enum ybp_search_direction direction)
 {
 	unsigned int num_increments = 0;
 	off64_t offset;
+	int directionality;
 	struct ybp_event *evbuf = malloc(sizeof(struct ybp_event));
 	ybp_init_event(evbuf);
 	offset = starting_offset;
+	if (direction == FORWARDS) {
+		directionality = 1;
+	} else {
+		directionality = -1;
+	}
 	Dprintf("In nearest offset mode, got fd=%d, starting_offset=%llu\n", p->fd, (long long)starting_offset);
-	while (num_increments < MAX_RETRIES && offset >= 0 && offset <= p->file_size - EVENT_HEADER_SIZE) 
+	while ((num_increments < MAX_RETRIES) && (offset >= 0) && (offset <= p->file_size - EVENT_HEADER_SIZE) )
 	{
 		ybp_reset_event(evbuf);
 		if (ybpi_read_event(p, offset, evbuf) < 0) {
@@ -329,13 +337,12 @@ off64_t ybp_nearest_offset(struct ybp_binlog_parser* p, off64_t starting_offset,
 			return -1;
 		}
 		if (ybpi_check_event(evbuf, p)) {
-			if (outbuf != NULL) {
-				ybp_copy_event(outbuf, evbuf);
-			}
 			ybp_dispose_event(evbuf);
 			return offset;
-		} else {
-			offset += direction;
+		}
+		else {
+			Dprintf("incrementing offset from %zd to %zd\n", offset, offset + directionality);
+			offset += directionality;
 			++num_increments;
 		}
 	}
@@ -351,6 +358,7 @@ off64_t ybp_nearest_offset(struct ybp_binlog_parser* p, off64_t starting_offset,
 static int ybpi_read_event(struct ybp_binlog_parser* p, off_t offset, struct ybp_event* evbuf)
 {
 	ssize_t amt_read;
+	Dprintf("Reading event at offset %zd\n", offset);
 	p->max_timestamp = time(NULL);
 	if ((lseek(p->fd, offset, SEEK_SET) < 0)) {
 		perror("Error seeking");
@@ -378,6 +386,9 @@ static int ybpi_read_event(struct ybp_binlog_parser* p, off_t offset, struct ybp
 			return -1;
 		}
 	}
+	else {
+		Dprintf("check_event failed\n");
+	}
 	return 0;
 }
 
@@ -391,12 +402,12 @@ static int ybpi_read_fde(struct ybp_binlog_parser* p)
 	int esi = p->enforce_server_id;
 	int fd = p->fd;
 
-	if ((evbuf = malloc(sizeof(struct ybp_event))) == NULL) {
+	if ((evbuf = ybp_get_event()) == NULL) {
 		return -1;
 	}
-	ybp_init_event(evbuf);
 
 	if (ybpi_read_event(p, 4, evbuf) < 0) {
+		Dprintf("Reading FDE failed\n");
 		ybp_dispose_event(evbuf);
 		return -1;
 	}
@@ -407,7 +418,7 @@ static int ybpi_read_fde(struct ybp_binlog_parser* p)
 		fprintf(stderr, "Invalid binlog! Expected version %d, got %d\n", BINLOG_VERSION, f->format_version);
 		exit(1);
 	}
-	p->min_timestamp = evbuf->timestamp;
+	p->min_timestamp = evbuf->timestamp - TIMESTAMP_FUDGE_FACTOR;
 	p->slave_server_id = evbuf->server_id;
 
 	offset = ybpi_next_after(evbuf);
@@ -419,6 +430,7 @@ static int ybpi_read_fde(struct ybp_binlog_parser* p)
 	ybp_dispose_event(evbuf);
 
 	lseek(fd, 4, SEEK_SET);
+	Dprintf("Done reading FDE\n");
 	p->has_read_fde = true;
 	return 0;
 }
@@ -426,6 +438,7 @@ static int ybpi_read_fde(struct ybp_binlog_parser* p)
 int ybp_next_event(struct ybp_binlog_parser* parser, struct ybp_event* evbuf)
 {
 	int ret = 0;
+	Dprintf("looking for next event, offset=%zd\n", parser->offset);
 	if (!parser->has_read_fde) {
 		ybpi_read_fde(parser);
 	}
@@ -476,6 +489,8 @@ struct ybp_query_event_safe* ybp_event_to_safe_qe(struct ybp_event* restrict e) 
 		struct ybp_query_event* qe = (struct ybp_query_event*)(e->data);
 		Dprintf("Constructing safe query event for 0x%p\n", (void*) e);
 		s = malloc(sizeof(struct ybp_query_event_safe));
+		if (s == NULL)
+			return NULL;
 		Dprintf("malloced 0x%p\n", (void*)s);
 		s->thread_id = qe->thread_id;
 		s->query_time = qe->query_time;
