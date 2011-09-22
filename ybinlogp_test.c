@@ -17,6 +17,7 @@ void usage(void) {
 	fprintf(stderr, "Options\n");
 	fprintf(stderr, "\t-h           show this help\n");
 	fprintf(stderr, "\t-o OFFSET    find the first event after the given offset\n");
+	fprintf(stderr, "\t-t TIME      find the first event after the given time\n");
 }
 
 int main(int argc, char** argv) {
@@ -25,13 +26,17 @@ int main(int argc, char** argv) {
 	struct ybp_binlog_parser* bp;
 	struct ybp_event* evbuf;
 	long starting_offset = -1;
-	while ((opt = getopt(argc, argv, "ho:")) != -1) {
+	long starting_time = -1;
+	while ((opt = getopt(argc, argv, "ho:t:")) != -1) {
 		switch (opt) {
 			case 'h':
 				usage();
 				return 0;
 			case 'o':      /* Offset mode */
 				starting_offset = atoll(optarg);
+				break;
+			case 't':      /* Time mode */
+				starting_time = atoll(optarg);
 				break;
 			case '?':
 				fprintf(stderr, "Unknown argument %c\n", optopt);
@@ -58,7 +63,7 @@ int main(int argc, char** argv) {
 	}
 	ybp_init_event(evbuf);
 	if (starting_offset >= 0) {
-		off64_t offset = ybp_nearest_offset(bp, starting_offset, FORWARDS);
+		off64_t offset = ybp_nearest_offset(bp, starting_offset);
 		if (offset == -2) {
 			fprintf(stderr, "Unable to find anything after offset %ld\n", starting_offset);
 			return 1;
@@ -71,8 +76,23 @@ int main(int argc, char** argv) {
 			ybp_rewind_bp(bp, offset);
 		}
 	}
+	if (starting_time >= 0) {
+		off64_t offset = ybp_nearest_time(bp, starting_time);
+		if (offset == -2) {
+			fprintf(stderr, "Unable to find anything after time %ld\n", starting_time);
+			return 1;
+		}
+		else if (offset == -1) {
+			perror("nearest_time");
+			return 1;
+		}
+		else {
+			ybp_rewind_bp(bp, offset);
+		}
+	}
 	int i = 0;
 	while (ybp_next_event(bp, evbuf) >= 0) {
+		printf("%d ", evbuf->timestamp);
 		if (evbuf->type_code == QUERY_EVENT) {
 			struct ybp_query_event_safe* s = ybp_event_to_safe_qe(evbuf);
 			printf("%s\n", s->statement);
@@ -80,7 +100,7 @@ int main(int argc, char** argv) {
 		}
 		else if (evbuf->type_code == ROTATE_EVENT) {
 			struct ybp_rotate_event_safe* s = ybp_event_to_safe_re(evbuf);
-			printf("%s.%llu\n", s->file_name, (long long unsigned)s->next_position);
+			printf("%s pos %llu\n", s->file_name, (long long unsigned)s->next_position);
 			ybp_dispose_safe_re(s);
 		}
 		else if (evbuf->type_code == XID_EVENT) {
@@ -89,7 +109,7 @@ int main(int argc, char** argv) {
 			ybp_dispose_safe_xe(s);
 		}
 		else {
-			printf("%d\n", ybp_event_type(evbuf));
+			printf("%s\n", ybp_event_type(evbuf));
 		}
 		ybp_reset_event(evbuf);
 		i+=1;

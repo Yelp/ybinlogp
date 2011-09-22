@@ -117,7 +117,7 @@ struct ybp_intvar_event {
 };
 
 #define rotate_event_file_name(e) (e->data + 8)
-#define rotate_event_file_name_len(e) ((size_t)(e->length - EVENT_HEADER_SIZE -8))
+#define rotate_event_file_name_len(e) ((size_t)(e->length - EVENT_HEADER_SIZE - sizeof(uint64_t)))
 struct ybp_rotate_event {
 	uint64_t	next_position;
 	// file name of the next file (not NUL)
@@ -144,11 +144,6 @@ struct ybp_rotate_event_safe {
 	uint64_t	next_position;
 	char*		file_name;
 	size_t		file_name_len;
-};
-
-enum ybp_search_direction {
-	FORWARDS,
-	BACKWARDS,
 };
 
 /**
@@ -291,5 +286,7 @@ void ybp_dispose_safe_xe(struct ybp_xid_event*);
 /**
  * Search tools!
  **/
-off64_t ybp_nearest_offset(struct ybp_binlog_parser*, off64_t, enum ybp_search_direction);
+off64_t ybp_nearest_offset(struct ybp_binlog_parser* restrict, off64_t);
+
+off64_t ybp_nearest_time(struct ybp_binlog_parser* restrict, time_t target);
 #endif /* _YBINLOGP_H_ */

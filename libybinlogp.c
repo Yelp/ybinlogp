@@ -189,6 +189,7 @@ static int ybpi_read_fde(struct ybp_binlog_parser*);
 static int ybpi_read_event(struct ybp_binlog_parser*, off_t, struct ybp_event*);
 static bool ybpi_check_event(struct ybp_event*, struct ybp_binlog_parser*);
 static off64_t ybpi_next_after(struct ybp_event* restrict);
+static off64_t ybpi_nearest_offset(struct ybp_binlog_parser* restrict, off64_t, struct ybp_event* restrict, int);
 
 /******** implementation begins here ********/
 
@@ -231,12 +232,13 @@ void ybp_dispose_binlog_parser(struct ybp_binlog_parser* p)
 
 void ybp_init_event(struct ybp_event* evbuf)
 {
-	memset(evbuf, 0, sizeof(struct ybp_event*));
+	memset(evbuf, 0, sizeof(struct ybp_event));
 }
 
 struct ybp_event* ybp_get_event(void)
 {
 	struct ybp_event* event = malloc(sizeof(struct ybp_event));
+	Dprintf("Creating event at 0x%p\n", event);
 	ybp_init_event(event);
 	return event;
 }
@@ -315,20 +317,18 @@ static off64_t ybpi_next_after(struct ybp_event *evbuf) {
  *
  * If evbuf is non-null, copy it into there
  */
-off64_t ybp_nearest_offset(struct ybp_binlog_parser* p, off64_t starting_offset, enum ybp_search_direction direction)
+off64_t ybp_nearest_offset(struct ybp_binlog_parser* p, off64_t starting_offset)
+{
+	return ybpi_nearest_offset(p, starting_offset, NULL, 1);
+}
+
+off64_t ybpi_nearest_offset(struct ybp_binlog_parser* restrict p, off64_t starting_offset, struct ybp_event* restrict outbuf, int direction)
 {
 	unsigned int num_increments = 0;
 	off64_t offset;
-	int directionality;
-	struct ybp_event *evbuf = malloc(sizeof(struct ybp_event));
-	ybp_init_event(evbuf);
+	struct ybp_event *evbuf = ybp_get_event();
 	offset = starting_offset;
-	if (direction == FORWARDS) {
-		directionality = 1;
-	} else {
-		directionality = -1;
-	}
-	Dprintf("In nearest offset mode, got fd=%d, starting_offset=%llu\n", p->fd, (long long)starting_offset);
+	Dprintf("In nearest offset mode, got fd=%d, starting_offset=%llu, direction=%d\n", p->fd, (long long)starting_offset, direction);
 	while ((num_increments < MAX_RETRIES) && (offset >= 0) && (offset <= p->file_size - EVENT_HEADER_SIZE) )
 	{
 		ybp_reset_event(evbuf);
@@ -337,12 +337,14 @@ off64_t ybp_nearest_offset(struct ybp_binlog_parser* p, off64_t starting_offset,
 			return -1;
 		}
 		if (ybpi_check_event(evbuf, p)) {
+			if (outbuf != NULL)
+				ybp_copy_event(outbuf, evbuf);
 			ybp_dispose_event(evbuf);
 			return offset;
 		}
 		else {
-			Dprintf("incrementing offset from %zd to %zd\n", offset, offset + directionality);
-			offset += directionality;
+			Dprintf("incrementing offset from %zd to %zd\n", offset, offset + direction);
+			offset += direction;
 			++num_increments;
 		}
 	}
@@ -350,6 +352,54 @@ off64_t ybp_nearest_offset(struct ybp_binlog_parser* p, off64_t starting_offset,
 	Dprintf("Unable to find anything (offset=%llu)\n",(long long) offset);
 	return -2;
 }
+
+/**
+ * Binary-search to find the record closest to the requested time
+ **/
+off64_t ybp_nearest_time(struct ybp_binlog_parser* restrict p, time_t target)
+{
+	off64_t file_size = p->file_size;
+	struct ybp_event *evbuf = ybp_get_event();
+	off64_t offset = file_size / 2;
+	off64_t next_increment = file_size / 4;
+	int directionality = 1;
+	off64_t found, last_found = 0;
+	while (next_increment > 2) {
+		long long delta;
+		ybp_reset_event(evbuf);
+		found = ybpi_nearest_offset(p, offset, evbuf, directionality);
+		if (found == -1) {
+			return found;
+		}
+		else if (found == -2) {
+			fprintf(stderr, "Ran off the end of the file, probably going to have a bad match\n");
+			last_found = found;
+			break;
+		}
+		last_found = found;
+		delta = (evbuf->timestamp - target);
+		if (delta > 0) {
+			directionality = -1;
+		}
+		else if (delta < 0) {
+			directionality = 1;
+		}
+		Dprintf("delta=%lld at %llu, directionality=%d, next_increment=%lld\n", (long long)delta, (unsigned long long)found, directionality, (long long)next_increment);
+		if (delta == 0) {
+			break;
+		}
+	  	if (directionality == -1) {
+			offset += (next_increment  * directionality);
+		}
+		else {
+			offset += (next_increment * directionality);
+		}
+		next_increment /= 2;
+	}
+	ybp_dispose_event(evbuf);
+	return last_found;
+}
+
 
 /**
  * Read an event from the parser parser, at offset offet, storing it in
@@ -451,7 +501,10 @@ int ybp_next_event(struct ybp_binlog_parser* parser, struct ybp_event* evbuf)
 		if ((parser->offset <= 0) || (evbuf->next_position == evbuf->offset) ||
 			(evbuf->next_position >= parser->file_size) ||
 			(parser->offset >= parser->file_size)) {
-			Dprintf("Got to last event");
+			Dprintf("Got to last event, parser->offset=%zd, evbuf->next_position=%zd, parser->file_size=%zd\n", 
+					parser->offset,
+					evbuf->next_position,
+					parser->file_size);
 			return 0;
 		} else {
 			return 1;
