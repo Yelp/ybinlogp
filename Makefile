@@ -13,7 +13,7 @@ ybinlogp: ybinlogp.o libybinlogp.so
 	gcc $(CFLAGS) $(LDFLAGS) -o $@ -lybinlogp $<
 
 libybinlogp.so: libybinlogp.so.1
-	ln -s $< $@
+	ln -fs $< $@
 
 libybinlogp.so.1: libybinlogp.o
 	gcc $(CFLAGS) $(LDFLAGS) -shared -Wl,-soname,$@ -o $@ $^
