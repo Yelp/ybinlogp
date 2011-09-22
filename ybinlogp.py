@@ -43,7 +43,7 @@ class QueryEvent(object):
 		self.query_time = query_time
 
 	def __str__(self):
-		return "Query(db=%s, statement=%s, query_time=%d)" % (self.db_name, self.statement, self.query_time)
+		return "Query(db='%s', statement='%s', query_time=%d)" % (self.db_name, self.statement, self.query_time)
 
 class RotateEventStruct(ctypes.Structure):
 	_fields_ = [("next_position", ctypes.c_uint64),
@@ -105,7 +105,7 @@ _event_to_safe_qe.argtypes = [ctypes.POINTER(EventStruct)]
 _event_to_safe_qe.restype = ctypes.POINTER(QueryEventStruct)
 
 _dispose_safe_qe = library.ybp_dispose_safe_qe
-_dispose_safe_qe.argtype = [ctypes.c_void_p]
+_dispose_safe_qe.argtype = [ctypes.POINTER(QueryEventStruct)]
 _dispose_safe_qe.qestype = None
 
 _event_to_safe_re = library.ybp_event_to_safe_re
@@ -113,7 +113,7 @@ _event_to_safe_re.argtypes = [ctypes.POINTER(EventStruct)]
 _event_to_safe_re.restype = ctypes.POINTER(RotateEventStruct)
 
 _dispose_safe_re = library.ybp_dispose_safe_re
-_dispose_safe_re.argtype = [ctypes.c_void_p]
+_dispose_safe_re.argtype = [ctypes.POINTER(RotateEventStruct)]
 _dispose_safe_re.restype = None
 
 _event_to_safe_xe = library.ybp_event_to_safe_xe
@@ -121,8 +121,12 @@ _event_to_safe_xe.argtypes = [ctypes.POINTER(EventStruct)]
 _event_to_safe_xe.restype = ctypes.POINTER(XIDEventStruct)
 
 _dispose_safe_xe = library.ybp_dispose_safe_xe
-_dispose_safe_xe.argtype = [ctypes.c_void_p]
+_dispose_safe_xe.argtype = [ctypes.POINTER(XIDEventStruct)]
 _dispose_safe_xe.restype = None
+
+_rewind_bp = library.ybp_rewind_bp
+_rewind_bp.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+_rewind_bp.restype = None
 
 class YBinlogPError(Exception):
 	def __init__(self, errno):
@@ -195,12 +199,14 @@ class YBinlogP(object):
 			if last:
 				raise StopIteration
 
-	def rewind(self):
+	def rewind(self, offset):
 		"""Reset this bp to point to the beginning of the file"""
-		pass
+		_rewind_bp(self.binlog_parser_handle, offset)
 
 if __name__ == '__main__':
-	bp = YBinlogP("mysql-bin.000018")
-	for event in bp:
+	bp = YBinlogP("mysql-bin.000017")
+	for i,event in enumerate(bp):
+		if i >= 10000:
+			break
 		print event
 	bp.clean_up()
