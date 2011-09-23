@@ -1,3 +1,7 @@
+0.5.3
+-----
+* indentation bug
+
 0.5.2
 -----
 * Fix a memory leak. Thanks to Evan Klitzke <evan@eklitzke.org> for pointing it
