@@ -1,3 +1,8 @@
+0.5.2
+-----
+* Fix a memory leak. Thanks to Evan Klitzke <evan@eklitzke.org> for pointing it
+  out.
+
 0.5.1
 -----
 * Remove a print statement that snuck into the python bindings
