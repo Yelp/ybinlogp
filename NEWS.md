@@ -1,3 +1,7 @@
+0.5.1
+-----
+* Remove a print statement that snuck into the python bindings
+
 0.5.0
 -----
 Big update!
