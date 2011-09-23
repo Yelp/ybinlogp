@@ -212,7 +212,6 @@ class YBinlogP(object):
 			raise NextEventError(ctypes.get_errno())
 		et = _event_type(self.event_buffer)
 		base_event = Event(et, self.event_buffer.contents.offset, self.event_buffer.contents.timestamp)
-		print "Got %s" % base_event
 		if et == "QUERY_EVENT":
 			query_event = _event_to_safe_qe(self.event_buffer)
 			base_event.data = QueryEvent(query_event.contents.db_name, query_event.contents.statement, query_event.contents.query_time)
