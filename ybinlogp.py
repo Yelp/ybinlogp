@@ -207,6 +207,7 @@ class YBinlogP(object):
 		self.always_update = always_update
 
 	def _get_next_event(self):
+        _reset_event(self.event_buffer)
 		last = _next_event(self.binlog_parser_handle, self.event_buffer)
 		if last < 0:
 			raise NextEventError(ctypes.get_errno())

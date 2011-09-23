@@ -253,10 +253,10 @@ struct ybp_event* ybp_get_event(void)
 void ybp_dispose_event(struct ybp_event* evbuf)
 {
 	Dprintf("About to dispose_event 0x%p\n", (void*)evbuf);
-	if (evbuf->data != 0) {
+	if (evbuf->data != NULL) {
 		Dprintf("Freeing data at 0x%p\n", (void*)evbuf->data);
 		free(evbuf->data);
-		evbuf->data = 0;
+		evbuf->data = NULL;
 	}
 	free(evbuf);
 }

@@ -138,7 +138,6 @@ int main(int argc, char** argv) {
 			}
 			else if (evbuf->type_code == XID_EVENT) {
 				struct ybp_xid_event* s = ybp_event_to_safe_xe(evbuf);
-				continue;
 				printf("%d XID %llu\n", evbuf->timestamp, (long long unsigned)s->id);
 				ybp_dispose_safe_xe(s);
 			}
