@@ -203,7 +203,7 @@ struct ybp_binlog_parser* ybp_get_binlog_parser(int fd)
 	}
 	result->fd = fd;
 	result->offset = 4;
-	result->enforce_server_id = 0;
+	result->enforce_server_id = false;
 	result->slave_server_id = 0;
 	result->master_server_id = 0;
 	result->min_timestamp = 0;
@@ -437,10 +437,18 @@ static int ybpi_read_event(struct ybp_binlog_parser* p, off_t offset, struct ybp
 			perror("malloc:");
 			return -1;
 		}
+		amt_read = 0;
 		Dprintf("malloced %d bytes at 0x%p for a %s\n", evbuf->length - EVENT_HEADER_SIZE, evbuf->data, ybpi_event_types[evbuf->type_code]);
-		if (read(p->fd, evbuf->data, evbuf->length - EVENT_HEADER_SIZE) < 0) {
-			perror("reading extra data:");
-			return -1;
+		while (amt_read < evbuf->length - EVENT_HEADER_SIZE) {
+			ssize_t remaining = evbuf->length - EVENT_HEADER_SIZE - amt_read;
+			char* target = evbuf->data + amt_read;
+			ssize_t read_this_time = read(p->fd, target, remaining);
+			if (read_this_time < 0) {
+				perror("read extra data");
+				free(evbuf->data);
+				return -1;
+			}
+			amt_read += read_this_time;
 		}
 	}
 	else {
@@ -456,8 +464,12 @@ static int ybpi_read_fde(struct ybp_binlog_parser* p)
 {
 	struct ybp_event* evbuf;
 	off64_t offset;
-	int esi = p->enforce_server_id;
+	bool esi = p->enforce_server_id;
 	int fd = p->fd;
+	time_t fde_time;
+	time_t evt_time;
+
+	p->enforce_server_id = false;
 
 	if ((evbuf = ybp_get_event()) == NULL) {
 		return -1;
@@ -475,7 +487,7 @@ static int ybpi_read_fde(struct ybp_binlog_parser* p)
 		fprintf(stderr, "Invalid binlog! Expected version %d, got %d\n", BINLOG_VERSION, f->format_version);
 		exit(1);
 	}
-	p->min_timestamp = evbuf->timestamp - TIMESTAMP_FUDGE_FACTOR;
+	fde_time = evbuf->timestamp;
 	p->slave_server_id = evbuf->server_id;
 
 	offset = ybpi_next_after(evbuf);
@@ -484,7 +496,16 @@ static int ybpi_read_fde(struct ybp_binlog_parser* p)
 	ybpi_read_event(p, offset, evbuf);
 
 	p->master_server_id = evbuf->server_id;
+	evt_time = evbuf->timestamp;
 	ybp_dispose_event(evbuf);
+
+	/*
+	 * Another signal: events will all be after *either* the FDE time (which
+	 * is the start of this server writing this binlog) or the first event
+	 * time (which is the start of the master writing its binlog), unless
+	 * you're in multi-master, which we don't particularly support.
+	 */
+	p->min_timestamp = min(fde_time, evt_time) - TIMESTAMP_FUDGE_FACTOR;
 
 	lseek(fd, 4, SEEK_SET);
 	Dprintf("Done reading FDE\n");
@@ -495,11 +516,14 @@ static int ybpi_read_fde(struct ybp_binlog_parser* p)
 int ybp_next_event(struct ybp_binlog_parser* parser, struct ybp_event* evbuf)
 {
 	int ret = 0;
+	bool esi = parser->enforce_server_id;
 	Dprintf("looking for next event, offset=%zd\n", parser->offset);
 	if (!parser->has_read_fde) {
 		ybpi_read_fde(parser);
 	}
+	parser->enforce_server_id = false;
 	ret = ybpi_read_event(parser, parser->offset, evbuf);
+	parser->enforce_server_id = esi;
 	if (ret < 0) { 
 		Dprintf("error in ybp_next_event: %d\n", ret);
 		return ret;
