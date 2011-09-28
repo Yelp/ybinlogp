@@ -4,7 +4,7 @@ tdir=`mktemp -d mysqldXXXXXXXXXX -t`
 pidfile="$tdir/mysqld.pid"
 errfile="$tdir/mysqld.err"
 datadir="$tdir/data/"
-logdir="$tdir/logs/"
+logdir="`pwd`"
 tmpdir="$tdir/tmp/"
 socket="$tdir/mysqld.sock"
 
@@ -54,8 +54,10 @@ fi
 
 mysql -S "$socket" < gen_test_data.sql
 
-cp -r $logdir/* .
-rm mysql-bin.index
-ls mysql-bin*
+#cp -r $logdir/* .
+#rm mysql-bin.index
+#ls mysql-bin*
+
+zsh
 
 stop_mysql

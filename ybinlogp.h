@@ -283,4 +283,7 @@ void ybp_dispose_safe_xe(struct ybp_xid_event*);
 off64_t ybp_nearest_offset(struct ybp_binlog_parser* restrict, off64_t);
 
 off64_t ybp_nearest_time(struct ybp_binlog_parser* restrict, time_t target);
+
+/* vim: set sts=0 sw=4 ts=4 noexpandtab: */
+
 #endif /* _YBINLOGP_H_ */

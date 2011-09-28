@@ -26,6 +26,7 @@ void usage(void) {
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Options\n");
 	fprintf(stderr, "\t-h           show this help\n");
+	fprintf(stderr, "\t-E           do not enforce server-id checking\n");
 	fprintf(stderr, "\t-o OFFSET    find the first event after the given offset\n");
 	fprintf(stderr, "\t-t TIME      find the first event after the given time\n");
 	fprintf(stderr, "\t-a COUNT     When used with one of the above, print COUNT items after the first one, default 2\n");
@@ -46,14 +47,18 @@ int main(int argc, char** argv) {
 	int num_to_show = 2;
 	int show_all = false;
 	bool q_mode = false;
+	bool esi = true;
 	char* database_limit = NULL;
-	while ((opt = getopt(argc, argv, "ho:t:a:D:q")) != -1) {
+	while ((opt = getopt(argc, argv, "ho:t:a:D:qE")) != -1) {
 		switch (opt) {
 			case 'h':
 				usage();
 				return 0;
 			case 'o':      /* Offset mode */
 				starting_offset = atoll(optarg);
+				break;
+			case 'E':
+				esi = false;
 				break;
 			case 't':      /* Time mode */
 				starting_time = atoll(optarg);
@@ -93,6 +98,7 @@ int main(int argc, char** argv) {
 		perror("init_binlog_parser");
 		return 1;
 	}
+	bp->enforce_server_id = esi;
 	if ((evbuf = malloc(sizeof(struct ybp_event))) == NULL) {
 		perror("malloc event");
 		return 1;
@@ -143,6 +149,7 @@ int main(int argc, char** argv) {
 			}
 		} else {
 			ybp_print_event(evbuf, bp, stdout, q_mode, false, database_limit);
+			fprintf(stdout, "\n");
 		}
 		ybp_reset_event(evbuf);
 		i+=1;
@@ -150,3 +157,5 @@ int main(int argc, char** argv) {
 	ybp_dispose_event(evbuf);
 	ybp_dispose_binlog_parser(bp);
 }
+
+/* vim: set sts=0 sw=4 ts=4 noexpandtab: */
