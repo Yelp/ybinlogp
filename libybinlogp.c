@@ -34,157 +34,21 @@
 #define MIN_TYPE_CODE 0
 #define MAX_TYPE_CODE 27
 #define MIN_EVENT_LENGTH 19
-#define MAX_EVENT_LENGTH 16*1048576  // Max statement len is generally 16MB
-#define MAX_SERVER_ID 4294967295   // 0 <= server_id  <= 2**32
-#define TIMESTAMP_FUDGE_FACTOR 3600
+#define MAX_EVENT_LENGTH 16*1048576	/* Max statement len is generally 16MB */
+#define MAX_SERVER_ID 4294967295	   /* 0 <= server_id  <= 2**32 */
+#define TIMESTAMP_FUDGE_FACTOR 60	  /* seconds */
 
 /******* more defines ********/
 #define MAX_RETRIES	16*1048576  /* how many bytes to seek ahead looking for a record */
 
 #define GET_BIT(x,bit) (unsigned char)(!!(x & 1 << (bit-1)))
 
-/******* various mappings ********/
-static char* ybpi_event_types[27] = {
-	"UNKNOWN_EVENT",            // 0
-	"START_EVENT_V3",           // 1
-	"QUERY_EVENT",              // 2
-	"STOP_EVENT",               // 3
-	"ROTATE_EVENT",             // 4
-	"INTVAR_EVENT",             // 5
-	"LOAD_EVENT",               // 6
-	"SLAVE_EVENT",              // 7
-	"CREATE_FILE_EVENT",        // 8
-	"APPEND_BLOCK_EVENT",       // 9
-	"EXEC_LOAD_EVENT",          // 10
-	"DELETE_FILE_EVENT",        // 11
-	"NEW_LOAD_EVENT",           // 12
-	"RAND_EVENT",               // 13
-	"USER_VAR_EVENT",           // 14
-	"FORMAT_DESCRIPTION_EVENT", // 15
-	"XID_EVENT",                // 16
-	"BEGIN_LOAD_QUERY_EVENT",   // 17
-	"EXECUTE_LOAD_QUERY_EVENT", // 18
-	"TABLE_MAP_EVENT",          // 19
-	"PRE_GA_WRITE_ROWS_EVENT",  // 20
-	"PRE_GA_DELETE_ROWS_EVENT", // 21
-	"WRITE_ROWS_EVENT",         // 22
-	"UPDATE_ROWS_EVENT",        // 23
-	"DELETE_ROWS_EVENT",        // 24
-	"INCIDENT_EVENT",           // 25
-	"HEARTBEAT_LOG_EVENT"	    // 26
-};
+#define min(x,y) (((x) < (y)) ? (x) : (y))
 
-/*
-static char* ybpi_variable_types[10] = {
-	"Q_FLAGS2_CODE",               // 0
-	"Q_SQL_MODE_CODE",             // 1
-	"Q_CATALOG_CODE",              // 2
-	"Q_AUTO_INCREMENT",            // 3
-	"Q_CHARSET_CODE",              // 4
-	"Q_TIME_ZONE_CODE",            // 5
-	"Q_CATALOG_NZ_CODE",           // 6
-	"Q_LC_TIME_NAMES_CODE",        // 7
-	"Q_CHARSET_DATABASE_CODE",     // 8
-	"Q_TABLE_MAP_FOR_UPDATE_CODE", // 9
-};
-*/
-
-static char* ybpi_intvar_types[3] = {
-	"",
-	"LAST_INSERT_ID_EVENT",	       // 1
-	"INSERT_ID_EVENT",             // 2
-};
-
-static char* ybpi_flags[16] = {
-	"LOG_EVENT_BINLOG_IN_USE",     // 0x01
-	"LOG_EVENT_FORCED_ROTATE",     // 0x02 (deprecated)
-	"LOG_EVENT_THREAD_SPECIFIC",   // 0x04
-	"LOG_EVENT_SUPPRESS_USE",      // 0x08
-	"LOG_EVENT_UPDATE_TABLE_MAP_VERSION", // 0x10
-	"LOG_EVENT_ARTIFICIAL",        // 0x20
-	"LOG_EVENT_RELAY_LOG",         // 0x40
-	"",
-	"",
-};
-
-/* The mysterious FLAGS2 binlog code.
- * Seems to be a subset of mysql options.
- * A very small subset.
+/* Pulls in a bunch of strings and things that I don't really want in this
+ * file, but are only to be used here.
  */
-static char* ybpi_flags2[32] = {
-	"", // 0x01
-	"", // 0x02
-	"", // 0x04
-	"", // 0x08
-	"", // 0x10
-	"", // 0x20
-	"", // 0x40
-	"", // 0x80
-	"", // 0x100
-	"", // 0x200
-	"", // 0x400
-	"", // 0x800
-	"", // 0x1000
-	"", // 0x2000
-	"OPTION_AUTO_IS_NULL", // 0x4000
-	"", // 0x8000
-	"", // 0x10000
-	"", // 0x20000
-	"", // 0x40000
-	"OPTION_NOT_AUTOCOMMIT", // 0x80000
-	"", // 0x100000
-	"", // 0x200000
-	"", // 0x400000
-	"", // 0x800000
-	"", // 0x1000000
-	"", // 0x2000000
-	"OPTION_NO_FOREIGN_KEY_CHECKS", // 0x4000000
-	"OPTION_RELAXED_UNIQUE_CHECKS", // 0x8000000
-};
-
-/* Map of the lengths of status var data.
- * -1 indicates variable (the first byte is a length byte)
- *  -2 indicates variable + 1 (the first byte is a length byte that is
- *  wrong)
- */
-static int ybpi_status_var_data_len_by_type[10] = {
-	4, // 0 = Q_FLAGS2_CODE
-	8, // 1 = Q_SQL_MODE_CODE
-	-2,// 2 = Q_CATALOG_CODE (length byte + string + NUL)
-	4, // 3 = Q_AUTO_INCREMENT (2 2-byte ints)
-	6, // 4 = Q_CHARSET_CODE (3 2-byte ints)
-	-1,// 5 = Q_TIME_ZONE_CODE (length byte + string)
-	-1,// 6 = Q_CATALOG_NZ_CODE (length byte + string)
-	2, // 7 = Q_LC_TIME_NAMES_COE
-	2, // 8 = Q_CHARSET_DATABASE_CODE
-	8, // 9 = Q_TABLE_MAP_FOR_UPDATE_COE
-};
-
-enum ybpi_e_status_var_types {
-	Q_FLAGS2_CODE=0,
-	Q_SQL_MODE_CODE=1,
-	Q_CATALOG_CODE=2,
-	Q_AUTO_INCREMENT=3,
-	Q_CHARSET_CODE=4,
-	Q_TIME_ZONE_CODE=5,
-	Q_CATALOG_NZ_CODE=6,
-	Q_LC_TIME_NAMES_CODE=7,
-	Q_CHARSET_DATABASE_CODE=8,
-	Q_TABLE_MAP_FOR_UPDATE_CODE=9
-};
-
-static const char* ybpi_status_var_types[10] = {
-	"Q_FLAGS2_CODE",
-	"Q_SQL_MODE_CODE",
-	"Q_CATALOG_CODE",
-	"Q_AUTO_INCREMENT",
-	"Q_CHARSET_CODE",
-	"Q_TIME_ZONE_CODE",
-	"Q_CATALOG_NZ_CODE",
-	"Q_LC_TIME_NAMES_CODE",
-	"Q_CHARSET_DATABASE_CODE",
-	"Q_TABLE_MAP_FOR_UPDATE_CODE"
-};
+#include "ybinlogp-private.h"
 
 /******* predeclarations of ybpi functions *******/
 static int ybpi_read_fde(struct ybp_binlog_parser*);
@@ -691,16 +555,16 @@ void ybp_print_event(struct ybp_event* restrict e,
 	*/
 	fprintf(stream, "BYTE OFFSET %llu\n", (long long)e->offset);
 	fprintf(stream, "------------------------\n");
-	fprintf(stream, "timestamp:          %d = %s", e->timestamp, ctime(&t));
-	fprintf(stream, "type_code:          %s\n", ybpi_event_types[e->type_code]);
+	fprintf(stream, "timestamp:    	     %d = %s", e->timestamp, ctime(&t));
+	fprintf(stream, "type_code:    	     %s\n", ybpi_event_types[e->type_code]);
 	if (q_mode > 1)
 		return;
-	fprintf(stream, "server id:          %u\n", e->server_id);
+	fprintf(stream, "server id:    	     %u\n", e->server_id);
 	if (v_mode) {
-		fprintf(stream, "length:             %d\n", e->length);
-		fprintf(stream, "next pos:           %llu\n", (unsigned long long)e->next_position);
+		fprintf(stream, "length:    		 %d\n", e->length);
+		fprintf(stream, "next pos:    	     %llu\n", (unsigned long long)e->next_position);
 	}
-	fprintf(stream, "flags:              ");
+	fprintf(stream, "flags:    		  ");
 	for(i=16; i > 0; --i)
 	{
 		fprintf(stream, "%hhd", GET_BIT(e->flags, i));
@@ -709,7 +573,7 @@ void ybp_print_event(struct ybp_event* restrict e,
 	for(i=16; i > 0; --i)
 	{
 		if (GET_BIT(e->flags, i))
-			fprintf(stream, "	                    %s\n", ybpi_flags[i-1]);
+			fprintf(stream, "						%s\n", ybpi_flags[i-1]);
 	}
 	if (e->data == NULL) {
 		return;
@@ -746,116 +610,116 @@ void ybp_print_event(struct ybp_event* restrict e,
 				char* status_var_start = query_event_status_vars(e);
 				char* status_var_ptr = status_var_start;
 				while((status_var_ptr - status_var_start) < q->status_var_len) {
-					enum ybpi_e_status_var_types status_var_type = *status_var_ptr;
-					status_var_ptr++;
-					assert(status_var_type < 10);
-					switch (status_var_type) {
-						case Q_FLAGS2_CODE:
-							{
-							uint32_t val = *((uint32_t*)status_var_ptr);
-							status_var_ptr += 4;
-							fprintf(stream, "Q_FLAGS2:           ");
-							for(i=32; i > 0; --i)
-							{
-								fprintf(stream, "%hhd", GET_BIT(val, i));
-							}
-							fprintf(stream, "\n");
-							for(i=32; i > 0; --i)
-							{
-								if (GET_BIT(val, i))
-									fprintf(stream, "	                    %s\n", ybpi_flags2[i-1]);
-							}
-							break;
-							}
-						case Q_SQL_MODE_CODE:
-							{
-							uint64_t val = *((uint64_t*)status_var_ptr);
-							status_var_ptr += 8;
-							fprintf(stream, "Q_SQL_MODE:         0x%0llu\n", (unsigned long long)val);
-							break;
-							}
-						case Q_CATALOG_CODE:
-							{
-							uint8_t size = *(status_var_ptr++);
-							char* str = strndup(status_var_ptr, size+1);
-							status_var_ptr += size + 1;
-							fprintf(stream, "Q_CATALOG:          %s\n", str);
-							free(str);
-							break;
-							}
-						case Q_AUTO_INCREMENT:
-							{
-							uint16_t byte_1 = *(uint16_t*)status_var_ptr;
-							status_var_ptr += 2;
-							uint16_t byte_2 = *(uint16_t*)status_var_ptr;
-							status_var_ptr += 2;
-							fprintf(stream, "Q_AUTO_INCREMENT:   (%hu,%hu)\n", byte_1, byte_2);
-							break;
-							}
-						case Q_CHARSET_CODE:
-							{
-							uint16_t byte_1 = *(uint16_t*)status_var_ptr;
-							status_var_ptr += 2;
-							uint16_t byte_2 = *(uint16_t*)status_var_ptr;
-							status_var_ptr += 2;
-							uint16_t byte_3 = *(uint16_t*)status_var_ptr;
-							status_var_ptr += 2;
-							fprintf(stream, "Q_CHARSET:          (%hu,%hu,%hu)\n", byte_1, byte_2, byte_3);
-							break;
-							}
-						case Q_TIME_ZONE_CODE:
-							{
-							uint8_t size = *(status_var_ptr++);
-							char* str = strndup(status_var_ptr, size);
-							status_var_ptr += size;
-							fprintf(stream, "Q_TIME_ZONE:        %s\n", str);
-							free(str);
-							break;
-							}
-						case Q_CATALOG_NZ_CODE:
-							{
-							uint8_t size = *(status_var_ptr++);
-							char* str = strndup(status_var_ptr, size);
-							status_var_ptr += size;
-							fprintf(stream, "Q_CATALOG_NZ:       %s\n", str);
-							free(str);
-							break;
-							}
-						case Q_LC_TIME_NAMES_CODE:
-							{
-							uint16_t code = *(uint16_t*)status_var_ptr;
-							status_var_ptr += 2;
-							fprintf(stream, "Q_LC_TIME_NAMES:    %hu\n", code);
-							break;
-							}
-						case Q_CHARSET_DATABASE_CODE:
-							{
-							uint16_t code = *(uint16_t*)status_var_ptr;
-							status_var_ptr += 2;
-							fprintf(stream, "Q_CHARSET_DATABASE: %hu\n", code);
-							break;
-							}
-						default:
-							{
-							int incr = ybpi_status_var_data_len_by_type[status_var_type];
-							if (incr > 0) {
-								status_var_ptr += incr;
-							}
-							else if (incr == -1) {
-								uint8_t size = *status_var_ptr;
-								status_var_ptr += size + 1;
-							}
-							else if (incr == -2) {
-								uint8_t size = *status_var_ptr;
-								status_var_ptr += size + 2;
-							}
-							else {
-								assert(0);
-							}
-							fprintf(stream, "	                    %s\n", ybpi_status_var_types[status_var_type]);
-							break;
-							}
-					}
+				    enum ybpi_e_status_var_types status_var_type = *status_var_ptr;
+				    status_var_ptr++;
+				    assert(status_var_type < 10);
+				    switch (status_var_type) {
+				        case Q_FLAGS2_CODE:
+				            {
+				            uint32_t val = *((uint32_t*)status_var_ptr);
+				            status_var_ptr += 4;
+				            fprintf(stream, "Q_FLAGS2:           ");
+				            for(i=32; i > 0; --i)
+				            {
+				                fprintf(stream, "%hhd", GET_BIT(val, i));
+				            }
+				            fprintf(stream, "\n");
+				            for(i=32; i > 0; --i)
+				            {
+				                if (GET_BIT(val, i))
+				                    fprintf(stream, "                        %s\n", ybpi_flags2[i-1]);
+				            }
+				            break;
+				            }
+				        case Q_SQL_MODE_CODE:
+				            {
+				            uint64_t val = *((uint64_t*)status_var_ptr);
+				            status_var_ptr += 8;
+				            fprintf(stream, "Q_SQL_MODE:         0x%0llu\n", (unsigned long long)val);
+				            break;
+				            }
+				        case Q_CATALOG_CODE:
+				            {
+				            uint8_t size = *(status_var_ptr++);
+				            char* str = strndup(status_var_ptr, size+1);
+				            status_var_ptr += size + 1;
+				            fprintf(stream, "Q_CATALOG:          %s\n", str);
+				            free(str);
+				            break;
+				            }
+				        case Q_AUTO_INCREMENT:
+				            {
+				            uint16_t byte_1 = *(uint16_t*)status_var_ptr;
+				            status_var_ptr += 2;
+				            uint16_t byte_2 = *(uint16_t*)status_var_ptr;
+				            status_var_ptr += 2;
+				            fprintf(stream, "Q_AUTO_INCREMENT:   (%hu,%hu)\n", byte_1, byte_2);
+				            break;
+				            }
+				        case Q_CHARSET_CODE:
+				            {
+				            uint16_t byte_1 = *(uint16_t*)status_var_ptr;
+				            status_var_ptr += 2;
+				            uint16_t byte_2 = *(uint16_t*)status_var_ptr;
+				            status_var_ptr += 2;
+				            uint16_t byte_3 = *(uint16_t*)status_var_ptr;
+				            status_var_ptr += 2;
+				            fprintf(stream, "Q_CHARSET:          (%hu,%hu,%hu)\n", byte_1, byte_2, byte_3);
+				            break;
+				            }
+				        case Q_TIME_ZONE_CODE:
+				            {
+				            uint8_t size = *(status_var_ptr++);
+				            char* str = strndup(status_var_ptr, size);
+				            status_var_ptr += size;
+				            fprintf(stream, "Q_TIME_ZONE:        %s\n", str);
+				            free(str);
+				            break;
+				            }
+				        case Q_CATALOG_NZ_CODE:
+				            {
+				            uint8_t size = *(status_var_ptr++);
+				            char* str = strndup(status_var_ptr, size);
+				            status_var_ptr += size;
+				            fprintf(stream, "Q_CATALOG_NZ:       %s\n", str);
+				            free(str);
+				            break;
+				            }
+				        case Q_LC_TIME_NAMES_CODE:
+				            {
+				            uint16_t code = *(uint16_t*)status_var_ptr;
+				            status_var_ptr += 2;
+				            fprintf(stream, "Q_LC_TIME_NAMES:    %hu\n", code);
+				            break;
+				            }
+				        case Q_CHARSET_DATABASE_CODE:
+				            {
+				            uint16_t code = *(uint16_t*)status_var_ptr;
+				            status_var_ptr += 2;
+				            fprintf(stream, "Q_CHARSET_DATABASE: %hu\n", code);
+				            break;
+				            }
+				        default:
+				            {
+				            int incr = ybpi_status_var_data_len_by_type[status_var_type];
+				            if (incr > 0) {
+				                status_var_ptr += incr;
+				            }
+				            else if (incr == -1) {
+				                uint8_t size = *status_var_ptr;
+				                status_var_ptr += size + 1;
+				            }
+				            else if (incr == -2) {
+				                uint8_t size = *status_var_ptr;
+				                status_var_ptr += size + 2;
+				            }
+				            else {
+				                assert(0);
+				            }
+				            fprintf(stream, "                        %s\n", ybpi_status_var_types[status_var_type]);
+				            break;
+				            }
+				    }
 				}
 			}
 			fprintf(stream, "statement length:   %zd\n", statement_len);
@@ -905,3 +769,5 @@ void ybp_print_event(struct ybp_event* restrict e,
 			break;
 	}
 }
+
+/* vim: set sts=0 sw=4 ts=4 noexpandtab: */

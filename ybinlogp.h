@@ -81,15 +81,6 @@ struct ybp_format_description_event {
 	// random data
 };
 
-/**
- * These macros are horribly unsafe. Only use them of you know EXACTLY what
- * you are doing. Otherwise, use ybp_query_event_safe_data and
- * ybp_event_to_qes
- **/
-#define query_event_statement(e) (e->data + sizeof(struct ybp_query_event) + ((struct ybp_query_event*)e->data)->status_var_len + ((struct ybp_query_event*)e->data)->db_name_len + 1)
-#define query_event_status_vars(e) (e->data + sizeof(struct ybp_query_event))
-#define query_event_statement_len(e) (e->length - EVENT_HEADER_SIZE - sizeof(struct ybp_query_event) - ((struct ybp_query_event*)e->data)->status_var_len - ((struct ybp_query_event*)e->data)->db_name_len - 1)
-#define query_event_db_name(e) (e->data + sizeof(struct ybp_query_event) + ((struct ybp_query_event*)e->data)->status_var_len)
 struct ybp_query_event {
 	uint32_t	thread_id;
 	uint32_t	query_time;
@@ -116,8 +107,6 @@ struct ybp_intvar_event {
 	uint64_t	value;
 };
 
-#define rotate_event_file_name(e) (e->data + 8)
-#define rotate_event_file_name_len(e) ((size_t)(e->length - EVENT_HEADER_SIZE - sizeof(uint64_t)))
 struct ybp_rotate_event {
 	uint64_t	next_position;
 	// file name of the next file (not NUL)
