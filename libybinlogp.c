@@ -559,12 +559,12 @@ void ybp_print_event(struct ybp_event* restrict e,
 	fprintf(stream, "type_code:    	     %s\n", ybpi_event_types[e->type_code]);
 	if (q_mode > 1)
 		return;
-	fprintf(stream, "server id:    	     %u\n", e->server_id);
+	fprintf(stream, "server id:          %u\n", e->server_id);
 	if (v_mode) {
-		fprintf(stream, "length:    		 %d\n", e->length);
-		fprintf(stream, "next pos:    	     %llu\n", (unsigned long long)e->next_position);
+		fprintf(stream, "length:              %d\n", e->length);
+		fprintf(stream, "next pos:            %llu\n", (unsigned long long)e->next_position);
 	}
-	fprintf(stream, "flags:    		  ");
+	fprintf(stream, "flags:              ");
 	for(i=16; i > 0; --i)
 	{
 		fprintf(stream, "%hhd", GET_BIT(e->flags, i));
@@ -573,7 +573,7 @@ void ybp_print_event(struct ybp_event* restrict e,
 	for(i=16; i > 0; --i)
 	{
 		if (GET_BIT(e->flags, i))
-			fprintf(stream, "						%s\n", ybpi_flags[i-1]);
+			fprintf(stream, "                        %s\n", ybpi_flags[i-1]);
 	}
 	if (e->data == NULL) {
 		return;
