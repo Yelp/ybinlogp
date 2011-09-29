@@ -11,7 +11,7 @@
 #define _YBINLOGP_PRIVATE_H_
 
 /******* various mappings ********/
-static char* ybpi_event_types[27] = {
+char* ybpi_event_types[27] = {
 	"UNKNOWN_EVENT"             // 0
 	"START_EVENT_V3"            // 1
 	"QUERY_EVENT"               // 2
@@ -41,8 +41,7 @@ static char* ybpi_event_types[27] = {
 	"HEARTBEAT_LOG_EVENT"       // 26
 };
 
-/*
-static char* ybpi_variable_types[10] = {
+char* ybpi_variable_types[10] = {
 	"Q_FLAGS2_CODE"                // 0
 	"Q_SQL_MODE_CODE"              // 1
 	"Q_CATALOG_CODE"               // 2
@@ -54,15 +53,14 @@ static char* ybpi_variable_types[10] = {
 	"Q_CHARSET_DATABASE_CODE"      // 8
 	"Q_TABLE_MAP_FOR_UPDATE_CODE", // 9
 };
-*/
 
-static char* ybpi_intvar_types[3] = {
+char* ybpi_intvar_types[3] = {
 	"",
 	"LAST_INSERT_ID_EVENT"          // 1
 	"INSERT_ID_EVENT"               // 2
 };
 
-static char* ybpi_flags[16] = {
+char* ybpi_flags[16] = {
 	"LOG_EVENT_BINLOG_IN_USE"      // 0x01
 	"LOG_EVENT_FORCED_ROTATE"      // 0x02 (deprecated)
 	"LOG_EVENT_THREAD_SPECIFIC",   // 0x04
@@ -72,13 +70,20 @@ static char* ybpi_flags[16] = {
 	"LOG_EVENT_RELAY_LOG"          // 0x40
 	"",
 	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
 };
 
 /* The mysterious FLAGS2 binlog code.
  * Seems to be a subset of mysql options.
  * A very small subset.
  */
-static char* ybpi_flags2[32] = {
+char* ybpi_flags2[32] = {
 	"", // 0x01
 	"", // 0x02
 	"", // 0x04
@@ -114,7 +119,7 @@ static char* ybpi_flags2[32] = {
  *  -2 indicates variable + 1 (the first byte is a length byte that is
  *  wrong)
  */
-static int ybpi_status_var_data_len_by_type[10] = {
+int ybpi_status_var_data_len_by_type[10] = {
 	4, // 0 = Q_FLAGS2_CODE
 	8, // 1 = Q_SQL_MODE_CODE
 	-2,// 2 = Q_CATALOG_CODE (length byte + string + NUL)
@@ -140,7 +145,7 @@ enum ybpi_e_status_var_types {
 	Q_TABLE_MAP_FOR_UPDATE_CODE=9
 };
 
-static const char* ybpi_status_var_types[10] = {
+const char* ybpi_status_var_types[10] = {
 	"Q_FLAGS2_CODE",
 	"Q_SQL_MODE_CODE",
 	"Q_CATALOG_CODE",

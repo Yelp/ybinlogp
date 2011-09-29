@@ -702,6 +702,7 @@ void ybp_print_event(struct ybp_event* restrict e,
 						default:
 							{
 							int incr = ybpi_status_var_data_len_by_type[status_var_type];
+							fprintf(stream, "%s\n", ybpi_variable_types[status_var_type]);
 							if (incr > 0) {
 								status_var_ptr += incr;
 							}

@@ -9,6 +9,8 @@ while True:
             bp.clean_up()
             bp = YBinlogP(next_file, always_update=True)
             break
+        else:
+            print event.event_type
     else:
         print "Got to end at %r" % (bp.tell(),)
         break
