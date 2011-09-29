@@ -555,8 +555,8 @@ void ybp_print_event(struct ybp_event* restrict e,
 	*/
 	fprintf(stream, "BYTE OFFSET %llu\n", (long long)e->offset);
 	fprintf(stream, "------------------------\n");
-	fprintf(stream, "timestamp:    	     %d = %s", e->timestamp, ctime(&t));
-	fprintf(stream, "type_code:    	     %s\n", ybpi_event_types[e->type_code]);
+	fprintf(stream, "timestamp:    		 %d = %s", e->timestamp, ctime(&t));
+	fprintf(stream, "type_code:    		 %s\n", ybpi_event_types[e->type_code]);
 	if (q_mode > 1)
 		return;
 	fprintf(stream, "server id:          %u\n", e->server_id);
@@ -610,116 +610,116 @@ void ybp_print_event(struct ybp_event* restrict e,
 				char* status_var_start = query_event_status_vars(e);
 				char* status_var_ptr = status_var_start;
 				while((status_var_ptr - status_var_start) < q->status_var_len) {
-				    enum ybpi_e_status_var_types status_var_type = *status_var_ptr;
-				    status_var_ptr++;
-				    assert(status_var_type < 10);
-				    switch (status_var_type) {
-				        case Q_FLAGS2_CODE:
-				            {
-				            uint32_t val = *((uint32_t*)status_var_ptr);
-				            status_var_ptr += 4;
-				            fprintf(stream, "Q_FLAGS2:           ");
-				            for(i=32; i > 0; --i)
-				            {
-				                fprintf(stream, "%hhd", GET_BIT(val, i));
-				            }
-				            fprintf(stream, "\n");
-				            for(i=32; i > 0; --i)
-				            {
-				                if (GET_BIT(val, i))
-				                    fprintf(stream, "                        %s\n", ybpi_flags2[i-1]);
-				            }
-				            break;
-				            }
-				        case Q_SQL_MODE_CODE:
-				            {
-				            uint64_t val = *((uint64_t*)status_var_ptr);
-				            status_var_ptr += 8;
-				            fprintf(stream, "Q_SQL_MODE:         0x%0llu\n", (unsigned long long)val);
-				            break;
-				            }
-				        case Q_CATALOG_CODE:
-				            {
-				            uint8_t size = *(status_var_ptr++);
-				            char* str = strndup(status_var_ptr, size+1);
-				            status_var_ptr += size + 1;
-				            fprintf(stream, "Q_CATALOG:          %s\n", str);
-				            free(str);
-				            break;
-				            }
-				        case Q_AUTO_INCREMENT:
-				            {
-				            uint16_t byte_1 = *(uint16_t*)status_var_ptr;
-				            status_var_ptr += 2;
-				            uint16_t byte_2 = *(uint16_t*)status_var_ptr;
-				            status_var_ptr += 2;
-				            fprintf(stream, "Q_AUTO_INCREMENT:   (%hu,%hu)\n", byte_1, byte_2);
-				            break;
-				            }
-				        case Q_CHARSET_CODE:
-				            {
-				            uint16_t byte_1 = *(uint16_t*)status_var_ptr;
-				            status_var_ptr += 2;
-				            uint16_t byte_2 = *(uint16_t*)status_var_ptr;
-				            status_var_ptr += 2;
-				            uint16_t byte_3 = *(uint16_t*)status_var_ptr;
-				            status_var_ptr += 2;
-				            fprintf(stream, "Q_CHARSET:          (%hu,%hu,%hu)\n", byte_1, byte_2, byte_3);
-				            break;
-				            }
-				        case Q_TIME_ZONE_CODE:
-				            {
-				            uint8_t size = *(status_var_ptr++);
-				            char* str = strndup(status_var_ptr, size);
-				            status_var_ptr += size;
-				            fprintf(stream, "Q_TIME_ZONE:        %s\n", str);
-				            free(str);
-				            break;
-				            }
-				        case Q_CATALOG_NZ_CODE:
-				            {
-				            uint8_t size = *(status_var_ptr++);
-				            char* str = strndup(status_var_ptr, size);
-				            status_var_ptr += size;
-				            fprintf(stream, "Q_CATALOG_NZ:       %s\n", str);
-				            free(str);
-				            break;
-				            }
-				        case Q_LC_TIME_NAMES_CODE:
-				            {
-				            uint16_t code = *(uint16_t*)status_var_ptr;
-				            status_var_ptr += 2;
-				            fprintf(stream, "Q_LC_TIME_NAMES:    %hu\n", code);
-				            break;
-				            }
-				        case Q_CHARSET_DATABASE_CODE:
-				            {
-				            uint16_t code = *(uint16_t*)status_var_ptr;
-				            status_var_ptr += 2;
-				            fprintf(stream, "Q_CHARSET_DATABASE: %hu\n", code);
-				            break;
-				            }
-				        default:
-				            {
-				            int incr = ybpi_status_var_data_len_by_type[status_var_type];
-				            if (incr > 0) {
-				                status_var_ptr += incr;
-				            }
-				            else if (incr == -1) {
-				                uint8_t size = *status_var_ptr;
-				                status_var_ptr += size + 1;
-				            }
-				            else if (incr == -2) {
-				                uint8_t size = *status_var_ptr;
-				                status_var_ptr += size + 2;
-				            }
-				            else {
-				                assert(0);
-				            }
-				            fprintf(stream, "                        %s\n", ybpi_status_var_types[status_var_type]);
-				            break;
-				            }
-				    }
+					enum ybpi_e_status_var_types status_var_type = *status_var_ptr;
+					status_var_ptr++;
+					assert(status_var_type < 10);
+					switch (status_var_type) {
+						case Q_FLAGS2_CODE:
+							{
+							uint32_t val = *((uint32_t*)status_var_ptr);
+							status_var_ptr += 4;
+							fprintf(stream, "Q_FLAGS2:           ");
+							for(i=32; i > 0; --i)
+							{
+								fprintf(stream, "%hhd", GET_BIT(val, i));
+							}
+							fprintf(stream, "\n");
+							for(i=32; i > 0; --i)
+							{
+								if (GET_BIT(val, i))
+									fprintf(stream, "                   %s\n", ybpi_flags2[i-1]);
+							}
+							break;
+							}
+						case Q_SQL_MODE_CODE:
+							{
+							uint64_t val = *((uint64_t*)status_var_ptr);
+							status_var_ptr += 8;
+							fprintf(stream, "Q_SQL_MODE:         0x%0llu\n", (unsigned long long)val);
+							break;
+							}
+						case Q_CATALOG_CODE:
+							{
+							uint8_t size = *(status_var_ptr++);
+							char* str = strndup(status_var_ptr, size+1);
+							status_var_ptr += size + 1;
+							fprintf(stream, "Q_CATALOG:          %s\n", str);
+							free(str);
+							break;
+							}
+						case Q_AUTO_INCREMENT:
+							{
+							uint16_t byte_1 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							uint16_t byte_2 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							fprintf(stream, "Q_AUTO_INCREMENT:   (%hu,%hu)\n", byte_1, byte_2);
+							break;
+							}
+						case Q_CHARSET_CODE:
+							{
+							uint16_t byte_1 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							uint16_t byte_2 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							uint16_t byte_3 = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							fprintf(stream, "Q_CHARSET:          (%hu,%hu,%hu)\n", byte_1, byte_2, byte_3);
+							break;
+							}
+						case Q_TIME_ZONE_CODE:
+							{
+							uint8_t size = *(status_var_ptr++);
+							char* str = strndup(status_var_ptr, size);
+							status_var_ptr += size;
+							fprintf(stream, "Q_TIME_ZONE:        %s\n", str);
+							free(str);
+							break;
+							}
+						case Q_CATALOG_NZ_CODE:
+							{
+							uint8_t size = *(status_var_ptr++);
+							char* str = strndup(status_var_ptr, size);
+							status_var_ptr += size;
+							fprintf(stream, "Q_CATALOG_NZ:       %s\n", str);
+							free(str);
+							break;
+							}
+						case Q_LC_TIME_NAMES_CODE:
+							{
+							uint16_t code = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							fprintf(stream, "Q_LC_TIME_NAMES:    %hu\n", code);
+							break;
+							}
+						case Q_CHARSET_DATABASE_CODE:
+							{
+							uint16_t code = *(uint16_t*)status_var_ptr;
+							status_var_ptr += 2;
+							fprintf(stream, "Q_CHARSET_DATABASE: %hu\n", code);
+							break;
+							}
+						default:
+							{
+							int incr = ybpi_status_var_data_len_by_type[status_var_type];
+							if (incr > 0) {
+								status_var_ptr += incr;
+							}
+							else if (incr == -1) {
+								uint8_t size = *status_var_ptr;
+								status_var_ptr += size + 1;
+							}
+							else if (incr == -2) {
+								uint8_t size = *status_var_ptr;
+								status_var_ptr += size + 2;
+							}
+							else {
+								assert(0);
+							}
+							fprintf(stream, "                        %s\n", ybpi_status_var_types[status_var_type]);
+							break;
+							}
+					}
 				}
 			}
 			fprintf(stream, "statement length:   %zd\n", statement_len);
