@@ -1,3 +1,7 @@
+0.5.5
+-----
+* 0.5.4 lost some commas, sorry
+
 0.5.4
 -----
 * Some code cleanup
