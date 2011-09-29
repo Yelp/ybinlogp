@@ -1,0 +1,4 @@
+* Add proper unit and integration testing
+  - unit tests for C and python
+  - valgrind test over the python library
+* Expose the ESI setting to the python side

@@ -1,3 +1,10 @@
+0.5.4
+-----
+* Some code cleanup
+* Fixes a bug where the library might return a partial event
+* Improves the python example script
+* Adds a TODO file
+
 0.5.3
 -----
 * indentation bug
