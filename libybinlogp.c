@@ -51,8 +51,8 @@
 #include "ybinlogp-private.h"
 
 /******* predeclarations of ybpi functions *******/
-static int ybpi_read_fde(struct ybp_binlog_parser*);
-static int ybpi_read_event(struct ybp_binlog_parser*, off_t, struct ybp_event*);
+static int ybpi_read_fde(struct ybp_binlog_parser* restrict);
+static int ybpi_read_event(struct ybp_binlog_parser* restrict, off_t, struct ybp_event* restrict);
 static bool ybpi_check_event(struct ybp_event*, struct ybp_binlog_parser*);
 static off64_t ybpi_next_after(struct ybp_event* restrict);
 static off64_t ybpi_nearest_offset(struct ybp_binlog_parser* restrict, off64_t, struct ybp_event* restrict, int);
@@ -276,7 +276,7 @@ off64_t ybp_nearest_time(struct ybp_binlog_parser* restrict p, time_t target)
  * Read an event from the parser parser, at offset offet, storing it in
  * event evbuf (which should be already init'd)
  */
-static int ybpi_read_event(struct ybp_binlog_parser* p, off_t offset, struct ybp_event* evbuf)
+static int ybpi_read_event(struct ybp_binlog_parser* restrict p, off_t offset, struct ybp_event* restrict evbuf)
 {
 	ssize_t amt_read;
 	Dprintf("Reading event at offset %zd\n", offset);
@@ -377,7 +377,7 @@ static int ybpi_read_fde(struct ybp_binlog_parser* p)
 	return 0;
 }
 
-int ybp_next_event(struct ybp_binlog_parser* parser, struct ybp_event* evbuf)
+int ybp_next_event(struct ybp_binlog_parser* restrict parser, struct ybp_event* restrict evbuf)
 {
 	int ret = 0;
 	bool esi = parser->enforce_server_id;
@@ -522,7 +522,7 @@ void ybp_dispose_safe_xe(struct ybp_xid_event* xe)
 	free(xe);
 }
 
-char* ybp_event_type(struct ybp_event* restrict evbuf) {
+const char* ybp_event_type(struct ybp_event* restrict evbuf) {
 	Dprintf("Looking up type string for %d\n", evbuf->type_code);
 	return ybpi_event_types[evbuf->type_code];
 }

@@ -179,7 +179,7 @@ void ybp_dispose_binlog_parser(struct ybp_binlog_parser*);
  * Returns 0 if the current event is the last event, <0 on error, and >0
  * otherwise.
  */
-int ybp_next_event(struct ybp_binlog_parser*, struct ybp_event*);
+int ybp_next_event(struct ybp_binlog_parser* restrict, struct ybp_event* restrict);
 
 /**
  * Initialize an event object. Event objects must live on the heap
@@ -236,7 +236,7 @@ void ybp_print_event(struct ybp_event* restrict, struct ybp_binlog_parser* restr
 /**
  * Get the string type of an event
  **/
-char* ybp_event_type(struct ybp_event*);
+const char* ybp_event_type(struct ybp_event*);
 
 /**
  * Interpret an event as an FDE. Returns either a pointer to the FDE, or
