@@ -1,3 +1,7 @@
+0.5.6
+----
+* misc bugs
+
 0.5.5
 -----
 * 0.5.4 lost some commas, sorry
