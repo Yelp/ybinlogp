@@ -36,7 +36,7 @@
 #define MIN_EVENT_LENGTH 19
 #define MAX_EVENT_LENGTH 16*1048576	/* Max statement len is generally 16MB */
 #define MAX_SERVER_ID 4294967295	   /* 0 <= server_id  <= 2**32 */
-#define TIMESTAMP_FUDGE_FACTOR 60	  /* seconds */
+#define TIMESTAMP_FUDGE_FACTOR 3600	  /* seconds */
 
 /******* more defines ********/
 #define MAX_RETRIES	16*1048576  /* how many bytes to seek ahead looking for a record */
@@ -434,6 +434,7 @@ struct ybp_query_event_safe* ybp_event_to_safe_qe(struct ybp_event* restrict e) 
 		fprintf(stderr, "Illegal conversion attempted: %d -> %d\n", e->type_code, QUERY_EVENT);
 		return NULL;
 	} else {
+		assert(e->data != NULL);
 		struct ybp_query_event* qe = (struct ybp_query_event*)(e->data);
 		Dprintf("Constructing safe query event for 0x%p\n", (void*) e);
 		s = malloc(sizeof(struct ybp_query_event_safe));
@@ -494,6 +495,7 @@ struct ybp_rotate_event_safe* ybp_event_to_safe_re(struct ybp_event* restrict e)
 	if (e->type_code != ROTATE_EVENT) {
 		fprintf(stderr, "Illegal conversion attempted: %d -> %d\n", e->type_code, ROTATE_EVENT);
 	} else {
+		assert(e->data != NULL);
 		struct ybp_rotate_event* re = (struct ybp_rotate_event*)(e->data);
 		s = malloc(sizeof(struct ybp_rotate_event_safe));
 		s->next_position = re->next_position;
@@ -508,6 +510,7 @@ struct ybp_xid_event* ybp_event_to_safe_xe(struct ybp_event* restrict e) {
 	if (e->type_code != XID_EVENT) {
 		fprintf(stderr, "Illegal conversion attempted: %d -> %d\n", e->type_code, ROTATE_EVENT);
 	} else {
+		assert(e->data != NULL);
 		struct ybp_xid_event* xe = (struct ybp_xid_event*)(e->data);
 		s = malloc(sizeof(struct ybp_xid_event));
 		if (s == NULL)
