@@ -1,5 +1,5 @@
 SOURCES := $(wildcard *.c *.h)
-TARGETS := ybinlogp libybinlogp.so.1 libybinlogp.so
+TARGETS := libybinlogp.so.1 libybinlogp.so ybinlogp
 
 prefix := /usr
 
@@ -9,7 +9,7 @@ LDFLAGS += -L.
 
 all: $(TARGETS)
 
-ybinlogp: ybinlogp.o
+ybinlogp: ybinlogp.o libybinlogp.so
 	gcc $(CFLAGS) $(LDFLAGS) -o $@ -lybinlogp $<
 
 libybinlogp.so: libybinlogp.so.1
