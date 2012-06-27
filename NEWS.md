@@ -1,3 +1,7 @@
+0.5.7
+-----
+Change Makefile ordering
+
 0.5.6
 ----
 * misc bugs
