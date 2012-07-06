@@ -13,6 +13,11 @@ import errno
 import logging
 import time
 
+__author__ = 'James Brown <jbrown@yelp.com>'
+
+version_info = (0, 5, 8)
+__version__ = '.'.join(map(str, version_info))
+
 log = logging.getLogger('ybinlogp')
 
 library = ctypes.CDLL("libybinlogp.so.1", use_errno=True)

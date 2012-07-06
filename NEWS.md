@@ -1,6 +1,10 @@
+0.5.8
+-----
+* Add some retry logic around reading the binlog
+
 0.5.7
 -----
-Change Makefile ordering
+* Change Makefile ordering
 
 0.5.6
 ----
