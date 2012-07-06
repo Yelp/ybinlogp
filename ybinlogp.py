@@ -10,6 +10,10 @@
 import ctypes
 import datetime
 import errno
+import logging
+import time
+
+log = logging.getLogger('ybinlogp')
 
 library = ctypes.CDLL("libybinlogp.so.1", use_errno=True)
 
@@ -181,6 +185,9 @@ class NoEventsAfterTime(YBinlogPError):
 class NoEventsAfterOffset(YBinlogPError):
 	pass
 
+class EmptyEventError(YBinlogPError):
+	pass
+
 class YBinlogP(object):
 	"""Python interface to ybinlogp, the fast mysql binlog parser.
 
@@ -189,7 +196,7 @@ class YBinlogP(object):
 	bp = YBinlogP('/path/to/binlog/file')
 	for query in bp:
 		if event.event_type == "QUERY_EVENT":
-		    print event.data.statement
+			print event.data.statement
 	bp.clean_up()
 	"""
 	def __init__(self, filename, always_update=False):
@@ -213,6 +220,9 @@ class YBinlogP(object):
 			raise NextEventError(ctypes.get_errno())
 		et = _event_type(self.event_buffer)
 		base_event = Event(et, self.event_buffer.contents.offset, self.event_buffer.contents.timestamp)
+		# TODO: check this on the C side
+		if self.event_buffer.contents.data is None:
+			raise EmptyEventError()
 		if et == "QUERY_EVENT":
 			query_event = _event_to_safe_qe(self.event_buffer)
 			base_event.data = QueryEvent(query_event.contents.db_name, query_event.contents.statement, query_event.contents.query_time)
@@ -251,11 +261,24 @@ class YBinlogP(object):
 
 	def __iter__(self):
 		last = False
+		current_offset = -1
 		while not last:
 			if self.always_update:
 				self.update()
 			try:
 				(event, last) = self._get_next_event()
+				current_offset = event.offset
+			except EmptyEventError, e:
+				if current_offset >= 0:
+					log.error("Got an empty event, retrying at offset %d in 0.1s", current_offset)
+					time.sleep(0.1)
+					self.rewind(current_offset)
+					continue
+				else:
+					log.error("Got an empty event; starting at next position %d in 0.1s", next_position)
+					time.sleep(0.1)
+					self.rewind(event.contents.next_position)
+					continue
 			except NextEventError, e:
 				if e.errno == 0:
 					return
@@ -274,7 +297,7 @@ class YBinlogP(object):
 		offset = bp.first_offset_after_time(1293868800) # jan 1 2011
 		bp.rewind(offset)
 		for record in bp:
-		    # ...
+			# ...
 		"""
 		offset = _nearest_time(self.binlog_parser_handle, t)
 		if offset == -1:
@@ -291,7 +314,7 @@ class YBinlogP(object):
 		offset = bp.first_offset_after_offset(1048576) # skip the first 1 MB
 		bp.rewind(offset)
 		for record in bp:
-		    # ...
+			# ...
 		"""
 		offset = _nearest_offset(self.binlog_parser_handle, t)
 		if offset == -1:
@@ -300,3 +323,5 @@ class YBinlogP(object):
 			raise NoEventsAfterOffset()
 		else:
 			return offset
+
+# python: set noexpandtab ts=4 sw=4:
