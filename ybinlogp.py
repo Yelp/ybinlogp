@@ -280,9 +280,10 @@ class YBinlogP(object):
 					self.rewind(current_offset)
 					continue
 				else:
+					next_position = event.contents.next_position
 					log.error("Got an empty event; starting at next position %d in 0.1s", next_position)
 					time.sleep(0.1)
-					self.rewind(event.contents.next_position)
+					self.rewind(next_position)
 					continue
 			except NextEventError, e:
 				if e.errno == 0:
