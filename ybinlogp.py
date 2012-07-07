@@ -15,7 +15,7 @@ import time
 
 __author__ = 'James Brown <jbrown@yelp.com>'
 
-version_info = (0, 5, 8)
+version_info = (0, 5, 8, 1)
 __version__ = '.'.join(map(str, version_info))
 
 log = logging.getLogger('ybinlogp')

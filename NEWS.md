@@ -1,3 +1,7 @@
+0.5.8.1
+-------
+* Minor bugfix
+
 0.5.8
 -----
 * Add some retry logic around reading the binlog
