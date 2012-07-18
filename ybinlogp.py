@@ -15,7 +15,7 @@ import time
 
 __author__ = 'James Brown <jbrown@yelp.com>'
 
-version_info = (0, 5, 8, 1)
+version_info = (0, 5, 8, 2)
 __version__ = '.'.join(map(str, version_info))
 
 log = logging.getLogger('ybinlogp')
@@ -204,7 +204,7 @@ class YBinlogP(object):
 			print event.data.statement
 	bp.clean_up()
 	"""
-	def __init__(self, filename, always_update=False):
+	def __init__(self, filename, always_update=False, max_retries=3, sleep_interval=0.1):
 		"""Construct a YBinlogP.
 
 		Arguments:
@@ -217,6 +217,8 @@ class YBinlogP(object):
 		self.binlog_parser_handle = _init_bp(self._file.fileno())
 		self.event_buffer = _get_event();
 		self.always_update = always_update
+		self.max_retries = max_retries
+		self.sleep_interval = sleep_interval
 
 	def _get_next_event(self):
 		_reset_event(self.event_buffer)
@@ -267,6 +269,7 @@ class YBinlogP(object):
 	def __iter__(self):
 		last = False
 		current_offset = -1
+		retries = 0
 		while not last:
 			if self.always_update:
 				self.update()
@@ -274,17 +277,19 @@ class YBinlogP(object):
 				(event, last) = self._get_next_event()
 				current_offset = event.offset
 			except EmptyEventError, e:
-				if current_offset >= 0:
-					log.error("Got an empty event, retrying at offset %d in 0.1s", current_offset)
-					time.sleep(0.1)
-					self.rewind(current_offset)
+				if retries < self.max_retries:
+					if current_offset == -1:
+						log.error("Got an empty offset at the beginning, re-statting and retrying in 0.1s")
+						time.sleep(self.sleep_interval)
+						self.update()
+					else:
+						log.error("Got an empty event, retrying at offset %d in 0.1s", current_offset)
+						time.sleep(0.1)
+						self.rewind(self.sleep_interval)
+					retries += 1
 					continue
 				else:
-					next_position = event.contents.next_position
-					log.error("Got an empty event; starting at next position %d in 0.1s", next_position)
-					time.sleep(0.1)
-					self.rewind(next_position)
-					continue
+					raise
 			except NextEventError, e:
 				if e.errno == 0:
 					return
@@ -330,4 +335,4 @@ class YBinlogP(object):
 		else:
 			return offset
 
-# python: set noexpandtab ts=4 sw=4:
+# vim: set noexpandtab ts=4 sw=4:

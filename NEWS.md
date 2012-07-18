@@ -1,3 +1,7 @@
+0.5.8.2
+------
+* Limit the number of retries in a row
+
 0.5.8.1
 -------
 * Minor bugfix
