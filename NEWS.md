@@ -1,3 +1,7 @@
+0.5.8.3
+-------
+* Minor bugfix in Python bindings
+
 0.5.8.2
 ------
 * Limit the number of retries in a row
