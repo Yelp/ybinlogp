@@ -279,13 +279,13 @@ class YBinlogP(object):
 			except EmptyEventError, e:
 				if retries < self.max_retries:
 					if current_offset == -1:
-						log.error("Got an empty offset at the beginning, re-statting and retrying in 0.1s")
+						log.error("Got an empty offset at the beginning, re-statting and retrying in %fs", self.sleep_interval)
 						time.sleep(self.sleep_interval)
 						self.update()
 					else:
-						log.error("Got an empty event, retrying at offset %d in 0.1s", current_offset)
-						time.sleep(0.1)
-						self.rewind(self.sleep_interval)
+						log.error("Got an empty event, retrying at offset %d in %fs", current_offset, self.sleep_interval)
+						time.sleep(self.sleep_interval)
+						self.rewind(current_offset)
 					retries += 1
 					continue
 				else:
