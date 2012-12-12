@@ -295,6 +295,9 @@ static int ybpi_read_event(struct ybp_binlog_parser* restrict p, off_t offset, s
 		Dprintf("read %zd bytes, expected to read %d bytes in ybpi_read_event", amt_read, EVENT_HEADER_SIZE);
 		return -1;
 	}
+	if (evbuf->length + evbuf->offset > p->file_size) {
+		return -2;
+	}
 	if (ybpi_check_event(evbuf, p)) {
 		Dprintf("mallocing %d bytes\n", evbuf->length - EVENT_HEADER_SIZE);
 		if ((evbuf->data = malloc(evbuf->length - EVENT_HEADER_SIZE)) == NULL) {
