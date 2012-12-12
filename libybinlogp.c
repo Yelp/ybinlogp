@@ -71,7 +71,7 @@ struct ybp_binlog_parser* ybp_get_binlog_parser(int fd)
 	result->slave_server_id = 0;
 	result->master_server_id = 0;
 	result->min_timestamp = 0;
-	result->max_timestamp = time(NULL);
+	result->max_timestamp = time(NULL) + TIMESTAMP_FUDGE_FACTOR;
 	result->has_read_fde = false;
 	ybp_update_bp(result);
 	ybpi_read_fde(result);
@@ -167,6 +167,8 @@ static bool ybpi_check_event(struct ybp_event* e, struct ybp_binlog_parser* p)
 			e->timestamp <= p->max_timestamp) {
 		return true;
 	} else {
+		Dprintf("e->type_code = %d, e->length=%zd, e->timestamp=%d\n", e->type_code, e->length, e->timestamp);
+		Dprintf("p->min_timestamp = %d, p->max_timestamp = %d\n", p->min_timestamp, p->max_timestamp);
 		return false;
 	}
 }
@@ -280,7 +282,7 @@ static int ybpi_read_event(struct ybp_binlog_parser* restrict p, off_t offset, s
 {
 	ssize_t amt_read;
 	Dprintf("Reading event at offset %zd\n", offset);
-	p->max_timestamp = time(NULL);
+	p->max_timestamp = time(NULL) + TIMESTAMP_FUDGE_FACTOR;
 	if ((lseek(p->fd, offset, SEEK_SET) < 0)) {
 		perror("Error seeking");
 		return -1;
