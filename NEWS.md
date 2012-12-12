@@ -1,3 +1,7 @@
+0.5.8.4
+-------
+* More bugfixes when attempting to use ybinlogp to "tail" a log
+
 0.5.8.3
 -------
 * Minor bugfix in Python bindings
