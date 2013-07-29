@@ -1,3 +1,6 @@
+import tempfile
+
+import mock
 from testify import TestCase, setup, assert_equal
 
 from ybinlogp import YBinlogP
@@ -7,8 +10,8 @@ class YBinlogPTestCase(TestCase):
 
 	@setup
 	def setup_parser(self):
-		self.filename = 'the_filename'
-		self.parser = YBinlogP(self.filename)
+		self.binlog_file = tempfile.NamedTemporaryFile()
+		self.parser = YBinlogP(self.binlog_file.name)
 
 	def test__init__(self):
 		pass

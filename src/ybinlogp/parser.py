@@ -188,16 +188,19 @@ class NoEventsAfterOffset(YBinlogPError):
 class EmptyEventError(YBinlogPError):
 	pass
 
+
 class YBinlogP(object):
 	"""Python interface to ybinlogp, the fast mysql binlog parser.
 
 	Example usage:
 
-	bp = YBinlogP('/path/to/binlog/file')
-	for query in bp:
-		if event.event_type == "QUERY_EVENT":
-			print event.data.statement
-	bp.clean_up()
+	.. code-block:: python
+
+		bp = YBinlogP('/path/to/binlog/file')
+		for query in bp:
+			if event.event_type == "QUERY_EVENT":
+				print event.data.statement
+		bp.clean_up()
 	"""
 	def __init__(self, filename, always_update=False, max_retries=3, sleep_interval=0.1):
 		"""
@@ -214,7 +217,7 @@ class YBinlogP(object):
 		self.filename = filename
 		self._file = open(self.filename, 'r')
 		self.binlog_parser_handle = _init_bp(self._file.fileno())
-		self.event_buffer = _get_event();
+		self.event_buffer = _get_event()
 		self.always_update = always_update
 		self.max_retries = max_retries
 		self.sleep_interval = sleep_interval
@@ -257,7 +260,7 @@ class YBinlogP(object):
 		self._file.close()
 
 	def tell(self):
-		return (self.filename, _tell_bp(self.binlog_parser_handle))
+		return self.filename, _tell_bp(self.binlog_parser_handle)
 
 	def update(self):
 		"""Update the binlog parser. This just re-stats the underlying file descriptor.
@@ -296,10 +299,11 @@ class YBinlogP(object):
 					raise
 			yield event
 
-	# TODO: rename to seek
-	def rewind(self, offset):
+	def seek(self, offset):
 		"""Reset this bp to point to the beginning of the file"""
 		_rewind_bp(self.binlog_parser_handle, offset)
+
+	rewind = seek
 
 	def first_offset_after_time(self, t):
 		"""Find the first offset after the given unix timestamp. Usage:
@@ -334,5 +338,11 @@ class YBinlogP(object):
 			raise NoEventsAfterOffset()
 		else:
 			return offset
+
+	def __enter__(self):
+		return self
+
+	def __exit__(self, *args):
+		self.clean_up()
 
 # vim: set noexpandtab ts=4 sw=4:
