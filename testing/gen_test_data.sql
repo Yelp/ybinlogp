@@ -1,3 +1,5 @@
+-- Used by testing/gen_test_data.sh to create testing data
+
 CREATE DATABASE ybinlogp;
 USE ybinlogp;
 CREATE TABLE test1(x INT AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB;

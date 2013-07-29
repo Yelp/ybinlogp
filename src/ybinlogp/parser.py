@@ -249,15 +249,18 @@ class YBinlogP(object):
 
 		return (base_event, last == 0)
 
-	def clean_up(self):
+	def close(self):
 		"""Clean up some things that are allocated in C-land. Attempting to
-		use this object after calling this method will break."""
+		use this object after calling this method will break.
+		"""
 		# TODO: should this be a __del__?
 		_dispose_bp(self.binlog_parser_handle)
 		self.binlog_parser_handle = None
 		_dispose_event(self.event_buffer)
 		self.event_buffer = None
 		self._file.close()
+
+	clean_up = close
 
 	def tell(self):
 		return self.filename, _tell_bp(self.binlog_parser_handle)
@@ -338,11 +341,5 @@ class YBinlogP(object):
 			raise NoEventsAfterOffset()
 		else:
 			return offset
-
-	def __enter__(self):
-		return self
-
-	def __exit__(self, *args):
-		self.clean_up()
 
 # vim: set noexpandtab ts=4 sw=4:
