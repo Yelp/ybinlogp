@@ -1,5 +1,6 @@
+VPATH := src
 SOURCES := $(wildcard *.c *.h)
-TARGETS := libybinlogp.so.1 libybinlogp.so ybinlogp
+TARGETS := build/libybinlogp.so.1 build/libybinlogp.so build/ybinlogp
 
 prefix := /usr
 
@@ -9,19 +10,21 @@ LDFLAGS += -L.
 
 all: $(TARGETS)
 
-ybinlogp: ybinlogp.o libybinlogp.so
+build/ybinlogp: build/ybinlogp.o build/libybinlogp.so
 	gcc $(CFLAGS) $(LDFLAGS) -o $@ -lybinlogp $<
 
-libybinlogp.so: libybinlogp.so.1
+build/libybinlogp.so: build/libybinlogp.so.1
 	ln -fs $< $@
 
-libybinlogp.so.1: libybinlogp.o
+build/libybinlogp.so.1: build/libybinlogp.o
 	gcc $(CFLAGS) $(LDFLAGS) -shared -Wl,-soname,$@ -o $@ $^
 
-libybinlogp.o: libybinlogp.c ybinlogp-private.h
+build/libybinlogp.o: libybinlogp.c ybinlogp-private.h
 	gcc $(CFLAGS) $(LDFLAGS) -c -fPIC -o $@ $<
 
-clean::
-	rm -f $(TARGETS) *.o
+clean:
+	rm -f build/*
+	find . -iname '*.pyc' -delete
 
-ybinlogp.o: ybinlogp.c ybinlogp.h
+build/ybinlogp.o: ybinlogp.c ybinlogp.h
+	cc $(CFLAGS) $(LDFLAGS) -c -o $@ $<
