@@ -13,11 +13,6 @@ import errno
 import logging
 import time
 
-__author__ = 'James Brown <jbrown@yelp.com>'
-
-version_info = (0, 5, 8, 4)
-__version__ = '.'.join(map(str, version_info))
-
 log = logging.getLogger('ybinlogp')
 
 library = ctypes.CDLL("libybinlogp.so.1", use_errno=True)
@@ -205,12 +200,16 @@ class YBinlogP(object):
 	bp.clean_up()
 	"""
 	def __init__(self, filename, always_update=False, max_retries=3, sleep_interval=0.1):
-		"""Construct a YBinlogP.
-
-		Arguments:
-			filename: A binlog filename
-			always_update: if True, stat the file before doing anything
-				interesting
+		"""
+		:param filename: filename of a mysql binary log
+		:type  filename: string
+		:param always_update: if True stat the binlog file before doing anything
+		                      interesting
+		:type  always_update: boolean
+		:param max_retries: number of retries to perform on a EmptyEventError
+		:type  max_retries: int
+		:param sleep_interval: seconds to sleep between retries
+		:type  sleep_interval: float
 		"""
 		self.filename = filename
 		self._file = open(self.filename, 'r')
