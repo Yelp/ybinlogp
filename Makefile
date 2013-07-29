@@ -5,7 +5,7 @@ prefix := /usr
 
 CFLAGS += -Wall -ggdb -Wextra --std=c99 -pedantic
 LDFLAGS += -L.
-#CFLAGS=-Wall -ggdb -Wextra -DDEBUG
+#CFLAGS += -DDEBUG
 
 all: $(TARGETS)
 

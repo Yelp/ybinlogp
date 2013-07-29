@@ -5,3 +5,4 @@ mysql-bin*
 *.so
 *.so.*
 *.pyc
+.*.swp

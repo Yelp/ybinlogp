@@ -297,6 +297,7 @@ class YBinlogP(object):
 					raise
 			yield event
 
+	# TODO: rename to seek
 	def rewind(self, offset):
 		"""Reset this bp to point to the beginning of the file"""
 		_rewind_bp(self.binlog_parser_handle, offset)
