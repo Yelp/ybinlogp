@@ -72,9 +72,11 @@ if ! mysql_alive ; then
     exit 1
 fi
 
-mysql -S "$socket" < gen_test_data.sql
+echo "writing test data."
+mysql -S "$socket" < testing/gen_test_data.sql
 
 # Start a shell to prevent exit
+echo "Working dir: $workdir"
 $SHELL
 
 echo "shutting down mysql"

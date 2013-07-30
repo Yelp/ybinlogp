@@ -40,7 +40,8 @@ class Event(object):
 		self.data = None
 
 	def __str__(self):
-		return "%s at %s%s" % (self.event_type, self.time, ": " + str(self.data) if self.data is not None else "")
+		data = str(self.data) if self.data else ""
+		return "%s at %s: %s" % (self.event_type, self.time, data)
 
 class QueryEventStruct(ctypes.Structure):
 	"""Internal data structure for query events"""

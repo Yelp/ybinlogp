@@ -1,4 +1,4 @@
-mysql-bin*
 *.pyc
 .*.swp
 build/
+logs/
