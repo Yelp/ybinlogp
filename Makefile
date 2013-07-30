@@ -14,7 +14,9 @@ flakes:
 test: tests
 
 tests: all
-	PYTHONPATH=src testify --summary --exclude-suite=disabled --verbose tests
+	LD_LIBRARY_PATH=build \
+	PYTHONPATH=src \
+	testify --summary --exclude-suite=disabled --verbose tests
 
 clean:
 	make -C build clean
