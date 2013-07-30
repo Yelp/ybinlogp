@@ -33,6 +33,8 @@ class EventStruct(ctypes.Structure):
 
 class Event(object):
 	"""User-facing data structure for Events"""
+	__slots__ = 'event_type', 'offset', 'time', 'data'
+
 	def __init__(self, event_type, offset, timestamp):
 		self.event_type = event_type
 		self.offset = offset
@@ -57,13 +59,16 @@ class QueryEventStruct(ctypes.Structure):
 
 class QueryEvent(object):
 	"""User-facing data structure for query events"""
+	__slots__ = 'db_name', 'statement', 'query_time'
+
 	def __init__(self, db_name, statement, query_time):
 		self.db_name = db_name
 		self.statement = statement
 		self.query_time = query_time
 
 	def __str__(self):
-		return "Query(db='%s', statement='%s', query_time=%d)" % (self.db_name, self.statement, self.query_time)
+		return "Query(db='%s', statement='%s', query_time=%d)" % (
+				self.db_name, self.statement, self.query_time)
 
 class RotateEventStruct(ctypes.Structure):
 	"""Internal data structure for rotatation events"""
@@ -73,12 +78,15 @@ class RotateEventStruct(ctypes.Structure):
 
 class RotateEvent(object):
 	"""User-facing data structure for rotatation events"""
+	__slots__ = 'next_position', 'file_name'
+
 	def __init__(self, next_position, file_name):
 		self.next_position = next_position
 		self.file_name = file_name
 
 	def __str__(self):
-		return "Rotate(next file=%s, next_position=%d)" % (self.file_name, self.next_position)
+		return "Rotate(next file=%s, next_position=%d)" % (
+				self.file_name, self.next_position)
 
 class XIDEventStruct(ctypes.Structure):
 	"""Internal data structure for XID events"""
@@ -191,6 +199,50 @@ class EmptyEventError(YBinlogPError):
 	pass
 
 
+class EventType(object):
+	"""Enumeration of event types."""
+
+	rotate = "ROTATE_EVENT"
+	query = "QUERY_EVENT"
+	xid = "XID_EVENT"
+
+
+def build_event(event_buffer):
+	"""Create an :class:`Event` object from the mysql event.
+
+	:param event_buffer: a mysql event buffer 
+	:returns: :class:`Event` for the event
+	:raises: EmptyEventError
+	"""
+	event_type = _event_type(event_buffer)
+	base_event = Event(event_type,
+	                   event_buffer.contents.offset,
+	                   event_buffer.contents.timestamp)
+
+	if event_buffer.contents.data is None:
+		raise EmptyEventError()
+
+	if event_type == EventType.query:
+		query_event = _event_to_safe_qe(event_buffer)
+		base_event.data = QueryEvent(query_event.contents.db_name, 
+		                             query_event.contents.statement,
+		                             query_event.contents.query_time)
+		_dispose_safe_qe(query_event)
+
+	if event_type == EventType.rotate:
+		rotate_event = _event_to_safe_re(event_buffer)
+		base_event.data = RotateEvent(rotate_event.contents.next_position,
+		                              rotate_event.contents.file_name)
+		_dispose_safe_re(rotate_event)
+
+	if event_type == EventType.xid:
+		xid_event = _event_to_safe_xe(event_buffer)
+		base_event.data = XIDEvent(xid_event.contents.id)
+		_dispose_safe_xe(xid_event)
+
+	return base_event
+
+
 class YBinlogP(object):
 	"""Python interface to ybinlogp, the fast mysql binlog parser.
 
@@ -230,27 +282,7 @@ class YBinlogP(object):
 		last = _next_event(self.binlog_parser_handle, self.event_buffer)
 		if last < 0:
 			raise NextEventError(ctypes.get_errno())
-		et = _event_type(self.event_buffer)
-		base_event = Event(et, self.event_buffer.contents.offset, self.event_buffer.contents.timestamp)
-		# TODO: check this on the C side
-		if self.event_buffer.contents.data is None:
-			raise EmptyEventError()
-		if et == "QUERY_EVENT":
-			query_event = _event_to_safe_qe(self.event_buffer)
-			base_event.data = QueryEvent(query_event.contents.db_name, query_event.contents.statement, query_event.contents.query_time)
-			_dispose_safe_qe(query_event)
-
-		elif et == "ROTATE_EVENT":
-			rotate_event = _event_to_safe_re(self.event_buffer)
-			base_event.data = RotateEvent(rotate_event.contents.next_position, rotate_event.contents.file_name)
-			_dispose_safe_re(rotate_event)
-
-		elif et == "XID_EVENT":
-			xid_event = _event_to_safe_xe(self.event_buffer)
-			base_event.data = XIDEvent(xid_event.contents.id)
-			_dispose_safe_xe(xid_event)
-
-		return (base_event, last == 0)
+		return build_event(self.event_buffer), last == 0
 
 	def close(self):
 		"""Clean up some things that are allocated in C-land. Attempting to

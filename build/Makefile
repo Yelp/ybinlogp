@@ -8,7 +8,8 @@ CFLAGS += -Wall -ggdb -Wextra --std=c99 -pedantic
 LDFLAGS += -L.
 
 # Enable for debugging
-#CFLAGS += -DDEBUG
+debug: CFLAGS += -DDEBUG
+debug: all
 
 all: $(TARGETS)
 

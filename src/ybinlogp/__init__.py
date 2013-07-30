@@ -11,4 +11,5 @@ from ybinlogp.parser import NoEventsAfterTime
 from ybinlogp.parser import NoEventsAfterOffset
 from ybinlogp.parser import EmptyEventError
 from ybinlogp.parser import YBinlogP
+from ybinlogp.parser import EventType
 
