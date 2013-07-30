@@ -1,30 +1,22 @@
-VPATH := src
-SOURCES := $(wildcard *.c *.h)
-TARGETS := build/libybinlogp.so.1 build/libybinlogp.so build/ybinlogp
 
-prefix := /usr
 
-CFLAGS += -Wall -ggdb -Wextra --std=c99 -pedantic
-LDFLAGS += -L.
-#CFLAGS += -DDEBUG
+.PHONY: flakes tests clean docs build
 
-all: $(TARGETS)
 
-build/ybinlogp: build/ybinlogp.o build/libybinlogp.so
-	gcc $(CFLAGS) $(LDFLAGS) -o $@ -lybinlogp $<
+all: build
 
-build/libybinlogp.so: build/libybinlogp.so.1
-	ln -fs $< $@
+build:
+	make -C build
 
-build/libybinlogp.so.1: build/libybinlogp.o
-	gcc $(CFLAGS) $(LDFLAGS) -shared -Wl,-soname,$@ -o $@ $^
+flakes:
+	find -name "*.py" -print0 | xargs -0 pyflakes
 
-build/libybinlogp.o: libybinlogp.c ybinlogp-private.h
-	gcc $(CFLAGS) $(LDFLAGS) -c -fPIC -o $@ $<
+test: tests
+
+tests: all
+	PYTHONPATH=src testify --summary --exclude-suite=disabled --verbose tests
 
 clean:
-	rm -f build/*
+	make -C build clean
 	find . -iname '*.pyc' -delete
 
-build/ybinlogp.o: ybinlogp.c ybinlogp.h
-	cc $(CFLAGS) $(LDFLAGS) -c -o $@ $<
