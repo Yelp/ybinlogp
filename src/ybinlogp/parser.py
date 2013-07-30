@@ -312,35 +312,46 @@ class YBinlogP(object):
 		_update_bp(self.binlog_parser_handle)
 
 	def __iter__(self):
+		"""Return an iteration over the events in the binglog.
+		:raises: NextEventError, EmptyEventError
+		"""
 		last = False
 		current_offset = -1
 		retries = 0
 		while not last:
 			if self.always_update:
 				self.update()
+
 			try:
-				(event, last) = self._get_next_event()
+				event, last = self._get_next_event()
 				current_offset = event.offset
+				yield event
 			except EmptyEventError, e:
-				if retries < self.max_retries:
-					if current_offset == -1:
-						log.error("Got an empty offset at the beginning, re-statting and retrying in %fs", self.sleep_interval)
-						time.sleep(self.sleep_interval)
-						self.update()
-					else:
-						log.error("Got an empty event, retrying at offset %d in %fs", current_offset, self.sleep_interval)
-						time.sleep(self.sleep_interval)
-						self.rewind(current_offset)
-					retries += 1
-					continue
-				else:
+				if retries >= self.max_retries:
 					raise
+				self.handle_empty_event(e, current_offset)
+				retries += 1
 			except NextEventError, e:
 				if e.errno == 0:
 					return
 				else:
 					raise
-			yield event
+
+	def handle_empty_event(self, exc, current_offset):
+		"""If the empty event is at the start of a file, update and sleep,
+		otherwise return to the previous good offset and try again.
+		"""
+		if current_offset == -1:
+			log.error("Got an empty offset at the beginning, re-statting "
+			          "and retrying in %fs", self.sleep_interval)
+			time.sleep(self.sleep_interval)
+			self.update()
+			return
+
+		log.error("Got an empty event, retrying at offset %d in %fs",
+				current_offset, self.sleep_interval)
+		time.sleep(self.sleep_interval)
+		self.seek(current_offset)
 
 	def seek(self, offset):
 		"""Seek the binlog parser pointer to offset.

@@ -6,7 +6,7 @@
 all: build
 
 build:
-	make -C build
+	make -C build all
 
 debug:
 	make -C build debug 

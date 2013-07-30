@@ -14,3 +14,6 @@ class YBinlogPTestCase(TestCase):
 		self.parser = YBinlogP(self.binlog_file.name)
 
 
+	# TODO: empty event at start
+
+	# TODO: empty event midway

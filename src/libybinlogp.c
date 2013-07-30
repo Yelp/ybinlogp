@@ -158,24 +158,21 @@ void ybp_reset_event(struct ybp_event* evbuf)
  **/
 static bool ybpi_check_event(struct ybp_event* e, struct ybp_binlog_parser* p)
 {
-	if ((!p->enforce_server_id || (e->server_id == p->slave_server_id) || (e->server_id == p->master_server_id)) &&
-			e->type_code > MIN_TYPE_CODE &&
-			e->type_code < MAX_TYPE_CODE &&
-			e->length >= MIN_EVENT_LENGTH &&
-			e->length < MAX_EVENT_LENGTH && 
-			e->timestamp >= p->min_timestamp &&
-			e->timestamp <= p->max_timestamp) {
-		return true;
-	} else {
-		Dprintf("e->type_code = %d, e->length=%zd, e->timestamp=%d\n",
+	Dprintf("e->type_code = %d, e->length=%zd, e->timestamp=%d\n",
 				e->type_code,
 				e->length,
 				e->timestamp);
-		Dprintf("p->min_timestamp = %d, p->max_timestamp = %d\n",
+	Dprintf("p->min_timestamp = %d, p->max_timestamp = %d\n",
 				p->min_timestamp,
 				p->max_timestamp);
-		return false;
-	}
+
+	return ((!p->enforce_server_id ||
+				 (e->server_id == p->slave_server_id) ||
+				 (e->server_id == p->master_server_id)) &&
+			e->type_code > MIN_TYPE_CODE &&
+			e->type_code < MAX_TYPE_CODE &&
+			e->length >= MIN_EVENT_LENGTH &&
+			e->length < MAX_EVENT_LENGTH); 
 }
 
 /**

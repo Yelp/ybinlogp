@@ -1,3 +1,5 @@
+import datetime
+
 from testify import TestCase, setup, assert_equal
 
 from ybinlogp import YBinlogP, EventType
@@ -28,4 +30,10 @@ class YBinlogPAcceptanceTestCase(TestCase):
 				'INSERT INTO test2(x) VALUES("Bananas r good")')
 
 	def test_with_delayed_statement(self):
-		pass
+		filename = 'testing/data/mysql-bin.delayed-event'
+		parser = YBinlogP(filename)
+		events = list(parser)
+		assert_equal(len(events), 38)
+		# Event has a timestamp way in the past relative to FDE
+		assert_equal(events[30].time, datetime.datetime(2013, 07, 30, 10, 2, 37))
+
