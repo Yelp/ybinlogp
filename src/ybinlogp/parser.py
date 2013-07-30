@@ -312,7 +312,7 @@ class YBinlogP(object):
 		_update_bp(self.binlog_parser_handle)
 
 	def __iter__(self):
-		"""Return an iteration over the events in the binglog.
+		"""Return an iteration over the events in the binlog.
 		:raises: NextEventError, EmptyEventError
 		"""
 		last = False
@@ -342,7 +342,7 @@ class YBinlogP(object):
 		otherwise return to the previous good offset and try again.
 		"""
 		if current_offset == -1:
-			log.error("Got an empty offset at the beginning, re-statting "
+			log.error("Got an empty offset at the beginning, re-stating "
 			          "and retrying in %fs", self.sleep_interval)
 			time.sleep(self.sleep_interval)
 			self.update()
