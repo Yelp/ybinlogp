@@ -17,6 +17,7 @@ log = logging.getLogger('ybinlogp')
 
 library = ctypes.CDLL("libybinlogp.so.1", use_errno=True)
 
+
 class EventStruct(ctypes.Structure):
 	"""Internal data structure for Events"""
 	_fields_ = [("timestamp", ctypes.c_uint32),
@@ -202,6 +203,7 @@ class YBinlogP(object):
 				print event.data.statement
 		bp.clean_up()
 	"""
+
 	def __init__(self, filename, always_update=False, max_retries=3, sleep_interval=0.1):
 		"""
 		:param filename: filename of a mysql binary log
@@ -263,6 +265,11 @@ class YBinlogP(object):
 	clean_up = close
 
 	def tell(self):
+		"""Return the current position of the binlog parser.
+
+		:return: a tuple of binlog filename, offset
+		:rtype: tuple
+		"""
 		return self.filename, _tell_bp(self.binlog_parser_handle)
 
 	def update(self):
@@ -303,10 +310,15 @@ class YBinlogP(object):
 			yield event
 
 	def seek(self, offset):
-		"""Reset this bp to point to the beginning of the file"""
+		"""Seek the binlog parser pointer to offset.
+
+		:param offset: offset within the binlog to move to
+		:type offset: int
+		"""
 		_rewind_bp(self.binlog_parser_handle, offset)
 
 	rewind = seek
+	"""Deprecated, renamed to :func:`seek`."""
 
 	def first_offset_after_time(self, t):
 		"""Find the first offset after the given unix timestamp. Usage:

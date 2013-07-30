@@ -12,6 +12,7 @@ def get_filename():
         raise SystemExit("Usage: %s <filename>" % sys.argv[0])
     return sys.argv[1]
 
+
 def main(filename):
     parser = YBinlogP(filename, always_update=True)
     while True:
