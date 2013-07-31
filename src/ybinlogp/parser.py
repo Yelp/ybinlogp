@@ -210,7 +210,7 @@ class EventType(object):
 def build_event(event_buffer):
 	"""Create an :class:`Event` object from the mysql event.
 
-	:param event_buffer: a mysql event buffer 
+	:param event_buffer: a mysql event buffer
 	:returns: :class:`Event` for the event
 	:raises: EmptyEventError
 	"""
@@ -224,7 +224,7 @@ def build_event(event_buffer):
 
 	if event_type == EventType.query:
 		query_event = _event_to_safe_qe(event_buffer)
-		base_event.data = QueryEvent(query_event.contents.db_name, 
+		base_event.data = QueryEvent(query_event.contents.db_name,
 		                             query_event.contents.statement,
 		                             query_event.contents.query_time)
 		_dispose_safe_qe(query_event)
@@ -342,7 +342,7 @@ class YBinlogP(object):
 		otherwise return to the previous good offset and try again.
 		"""
 		if current_offset == -1:
-			log.error("Got an empty offset at the beginning, re-stating "
+			log.error("Got an empty offset at the beginning, re-statting "
 			          "and retrying in %fs", self.sleep_interval)
 			time.sleep(self.sleep_interval)
 			self.update()
