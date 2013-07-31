@@ -1,3 +1,9 @@
+0.6
+---
+* Fixed a bug that would cause an EmptyEventError if ybinlogp received an event
+  that was older than 1 hour
+* Misc code cleanup, repo restructuring and adding tests
+
 0.5.8.4
 -------
 * More bugfixes when attempting to use ybinlogp to "tail" a log

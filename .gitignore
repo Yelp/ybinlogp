@@ -1,7 +1,4 @@
-ybinlogp
-ybinlogp_test
-mysql-bin*
-*.o
-*.so
-*.so.*
 *.pyc
+.*.swp
+build/
+logs/
