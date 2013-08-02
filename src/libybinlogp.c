@@ -158,19 +158,21 @@ void ybp_reset_event(struct ybp_event* evbuf)
  **/
 static bool ybpi_check_event(struct ybp_event* e, struct ybp_binlog_parser* p)
 {
-	if ((!p->enforce_server_id || (e->server_id == p->slave_server_id) || (e->server_id == p->master_server_id)) &&
+	Dprintf("e->type_code = %d, e->length=%zd, e->timestamp=%d\n",
+				e->type_code,
+				e->length,
+				e->timestamp);
+	Dprintf("p->min_timestamp = %d, p->max_timestamp = %d\n",
+				p->min_timestamp,
+				p->max_timestamp);
+
+	return ((!p->enforce_server_id ||
+				 (e->server_id == p->slave_server_id) ||
+				 (e->server_id == p->master_server_id)) &&
 			e->type_code > MIN_TYPE_CODE &&
 			e->type_code < MAX_TYPE_CODE &&
-			e->length > MIN_EVENT_LENGTH &&
-			e->length < MAX_EVENT_LENGTH && 
-			e->timestamp >= p->min_timestamp &&
-			e->timestamp <= p->max_timestamp) {
-		return true;
-	} else {
-		Dprintf("e->type_code = %d, e->length=%zd, e->timestamp=%d\n", e->type_code, e->length, e->timestamp);
-		Dprintf("p->min_timestamp = %d, p->max_timestamp = %d\n", p->min_timestamp, p->max_timestamp);
-		return false;
-	}
+			e->length >= MIN_EVENT_LENGTH &&
+			e->length < MAX_EVENT_LENGTH);
 }
 
 /**
@@ -393,7 +395,7 @@ int ybp_next_event(struct ybp_binlog_parser* restrict parser, struct ybp_event* 
 	parser->enforce_server_id = false;
 	ret = ybpi_read_event(parser, parser->offset, evbuf);
 	parser->enforce_server_id = esi;
-	if (ret < 0) { 
+	if (ret < 0) {
 		Dprintf("error in ybp_next_event: %d\n", ret);
 		return ret;
 	} else {
@@ -401,7 +403,7 @@ int ybp_next_event(struct ybp_binlog_parser* restrict parser, struct ybp_event* 
 		if ((parser->offset <= 0) || (evbuf->next_position == evbuf->offset) ||
 			(evbuf->next_position >= parser->file_size) ||
 			(parser->offset >= parser->file_size)) {
-			Dprintf("Got to last event, parser->offset=%zd, evbuf->next_position=%u, parser->file_size=%zd\n", 
+			Dprintf("Got to last event, parser->offset=%zd, evbuf->next_position=%u, parser->file_size=%zd\n",
 					parser->offset,
 					evbuf->next_position,
 					parser->file_size);
