@@ -13,6 +13,7 @@ import errno
 import logging
 import time
 
+
 log = logging.getLogger('ybinlogp')
 
 library = ctypes.CDLL("libybinlogp.so.1", use_errno=True)

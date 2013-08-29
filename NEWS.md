@@ -4,6 +4,10 @@
   that was older than 1 hour
 * Misc code cleanup, repo restructuring and adding tests
 
+0.5.8.5
+-------
+* Apparently, I broke time-based search in the last release. This fixes it.
+
 0.5.8.4
 -------
 * More bugfixes when attempting to use ybinlogp to "tail" a log

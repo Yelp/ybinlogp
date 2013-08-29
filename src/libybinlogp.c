@@ -207,7 +207,7 @@ off64_t ybpi_nearest_offset(struct ybp_binlog_parser* restrict p, off64_t starti
 	while ((num_increments < MAX_RETRIES) && (offset >= 0) && (offset <= p->file_size - EVENT_HEADER_SIZE) )
 	{
 		ybp_reset_event(evbuf);
-		if (ybpi_read_event(p, offset, evbuf) < 0) {
+		if (ybpi_read_event(p, offset, evbuf) == -1) {
 			ybp_dispose_event(evbuf);
 			return -1;
 		}
@@ -239,10 +239,12 @@ off64_t ybp_nearest_time(struct ybp_binlog_parser* restrict p, time_t target)
 	off64_t next_increment = file_size / 4;
 	int directionality = 1;
 	off64_t found, last_found = 0;
+	Dprintf("Starting nearest_time with next_increment=%d\n", next_increment);
 	while (next_increment > 2) {
 		long long delta;
 		ybp_reset_event(evbuf);
 		found = ybpi_nearest_offset(p, offset, evbuf, directionality);
+		Dprintf("Looking for nearest offset to %zd, got %d\n", offset, found);
 		if (found == -1) {
 			return found;
 		}
@@ -279,6 +281,8 @@ off64_t ybp_nearest_time(struct ybp_binlog_parser* restrict p, time_t target)
 /**
  * Read an event from the parser parser, at offset offet, storing it in
  * event evbuf (which should be already init'd)
+ *
+ * Returns -1 for system errors (seek, malloc) and -2 for format errors
  */
 static int ybpi_read_event(struct ybp_binlog_parser* restrict p, off_t offset, struct ybp_event* restrict evbuf)
 {
