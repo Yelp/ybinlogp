@@ -1,2 +1,3 @@
 ACLOCAL_AMFLAGS = -I m4
-SUBDIRS = include libybinlogp src
+EXTRA_DIST = README.md
+SUBDIRS = include libybinlogp src py

@@ -40,5 +40,8 @@ AC_SYS_LARGEFILE
 AC_FUNC_MALLOC
 AC_CHECK_FUNCS([memmove memset strdup strerror strndup])
 
-AC_CONFIG_FILES([Makefile include/Makefile libybinlogp/Makefile src/Makefile])
+# python stuff
+AM_PATH_PYTHON
+
+AC_CONFIG_FILES([Makefile include/Makefile libybinlogp/Makefile src/Makefile py/Makefile])
 AC_OUTPUT
