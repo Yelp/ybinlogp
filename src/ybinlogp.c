@@ -7,9 +7,6 @@
  * contents of that license can be found under license.txt
  */
 
-#define _XOPEN_SOURCE 600
-#define _GNU_SOURCE
-
 #if HAVE_CONFIG_H
     #include <config.h>
 #endif

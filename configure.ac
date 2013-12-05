@@ -3,6 +3,7 @@
 
 AC_PREREQ([2.69])
 AC_INIT([ybinlogp], [0.1], [Roguelazer@gmail.com])
+AC_USE_SYSTEM_EXTENSIONS
 AM_INIT_AUTOMAKE
 AC_CONFIG_HEADERS([config.h])
 

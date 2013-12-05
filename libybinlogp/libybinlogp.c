@@ -15,9 +15,6 @@
 
 #include <string.h>
 
-#define _XOPEN_SOURCE 600
-#define _GNU_SOURCE
-
 #if HAVE_CONFIG_H
     #include <config.h>
 #endif
@@ -33,7 +30,7 @@
 #include <assert.h>
 
 #include <ydebugs.h>
-#include "ybinlogp.h"
+#include <ybinlogp.h>
 
 /******* binlog parameters ********/
 #define MIN_TYPE_CODE 0
