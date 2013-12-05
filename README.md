@@ -43,4 +43,4 @@ It's Github... Fork away!
 License
 -------
 This work is available under the ISC (OpenBSD) license. The full contents are available
-as license.txt
+as COPYING.

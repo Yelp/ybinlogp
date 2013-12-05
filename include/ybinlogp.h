@@ -70,7 +70,7 @@ struct ybp_event {
 	uint32_t	next_position;
 	uint16_t	flags;
 	char*		data;
-	off64_t		offset;
+	off_t		offset;
 };
 
 struct ybp_format_description_event {
@@ -154,7 +154,7 @@ void ybp_update_bp(struct ybp_binlog_parser*);
 /**
  * Get the offset in the bp
  **/
-off64_t ybp_tell_bp(struct ybp_binlog_parser*);
+off_t ybp_tell_bp(struct ybp_binlog_parser*);
 
 /**
  * Rewind the ybp_binlog_parser to the given offset
@@ -280,9 +280,9 @@ void ybp_dispose_safe_xe(struct ybp_xid_event*);
 /**
  * Search tools!
  **/
-off64_t ybp_nearest_offset(struct ybp_binlog_parser* restrict, off64_t);
+off_t ybp_nearest_offset(struct ybp_binlog_parser* restrict, off_t);
 
-off64_t ybp_nearest_time(struct ybp_binlog_parser* restrict, time_t target);
+off_t ybp_nearest_time(struct ybp_binlog_parser* restrict, time_t target);
 
 /* vim: set sts=0 sw=4 ts=4 noexpandtab: */
 

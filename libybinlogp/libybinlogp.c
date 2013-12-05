@@ -13,8 +13,14 @@
  * Functions starting with ybpi_ are internal-only and should be static
  */
 
+#include <string.h>
+
 #define _XOPEN_SOURCE 600
 #define _GNU_SOURCE
+
+#if HAVE_CONFIG_H
+    #include <config.h>
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,12 +28,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <string.h>
 #include <time.h>
 #include <unistd.h>
 #include <assert.h>
 
-#include "debugs.h"
+#include <ydebugs.h>
 #include "ybinlogp.h"
 
 /******* binlog parameters ********/
@@ -54,8 +59,8 @@
 static int ybpi_read_fde(struct ybp_binlog_parser* restrict);
 static int ybpi_read_event(struct ybp_binlog_parser* restrict, off_t, struct ybp_event* restrict);
 static bool ybpi_check_event(struct ybp_event*, struct ybp_binlog_parser*);
-static off64_t ybpi_next_after(struct ybp_event* restrict);
-static off64_t ybpi_nearest_offset(struct ybp_binlog_parser* restrict, off64_t, struct ybp_event* restrict, int);
+static off_t ybpi_next_after(struct ybp_event* restrict);
+static off_t ybpi_nearest_offset(struct ybp_binlog_parser* restrict, off_t, struct ybp_event* restrict, int);
 
 /******** implementation begins here ********/
 
@@ -83,7 +88,7 @@ void ybp_rewind_bp(struct ybp_binlog_parser* p, off_t offset)
 	p->offset = offset;
 }
 
-off64_t ybp_tell_bp(struct ybp_binlog_parser* p)
+off_t ybp_tell_bp(struct ybp_binlog_parser* p)
 {
 	return p->offset;
 }
@@ -175,7 +180,7 @@ static bool ybpi_check_event(struct ybp_event* e, struct ybp_binlog_parser* p)
  * Find the offset of the next event after the one passed in.
  * Uses the built-in event chaining.
  **/
-static off64_t ybpi_next_after(struct ybp_event *evbuf) {
+static off_t ybpi_next_after(struct ybp_event *evbuf) {
 	/* Can't actually use next_position, because it will vary between
 	 * messages that are from master and messages that are from slave.
 	 * Usually, only the FDE is from the slave. But, still...
@@ -188,15 +193,15 @@ static off64_t ybpi_next_after(struct ybp_event *evbuf) {
  *
  * If evbuf is non-null, copy it into there
  */
-off64_t ybp_nearest_offset(struct ybp_binlog_parser* p, off64_t starting_offset)
+off_t ybp_nearest_offset(struct ybp_binlog_parser* p, off_t starting_offset)
 {
 	return ybpi_nearest_offset(p, starting_offset, NULL, 1);
 }
 
-off64_t ybpi_nearest_offset(struct ybp_binlog_parser* restrict p, off64_t starting_offset, struct ybp_event* restrict outbuf, int direction)
+off_t ybpi_nearest_offset(struct ybp_binlog_parser* restrict p, off_t starting_offset, struct ybp_event* restrict outbuf, int direction)
 {
 	unsigned int num_increments = 0;
-	off64_t offset;
+	off_t offset;
 	struct ybp_event *evbuf = ybp_get_event();
 	offset = starting_offset;
 	Dprintf("In nearest offset mode, got fd=%d, starting_offset=%llu, direction=%d\n", p->fd, (long long)starting_offset, direction);
@@ -227,14 +232,14 @@ off64_t ybpi_nearest_offset(struct ybp_binlog_parser* restrict p, off64_t starti
 /**
  * Binary-search to find the record closest to the requested time
  **/
-off64_t ybp_nearest_time(struct ybp_binlog_parser* restrict p, time_t target)
+off_t ybp_nearest_time(struct ybp_binlog_parser* restrict p, time_t target)
 {
-	off64_t file_size = p->file_size;
+	off_t file_size = p->file_size;
 	struct ybp_event *evbuf = ybp_get_event();
-	off64_t offset = file_size / 2;
-	off64_t next_increment = file_size / 4;
+	off_t offset = file_size / 2;
+	off_t next_increment = file_size / 4;
 	int directionality = 1;
-	off64_t found, last_found = 0;
+	off_t found, last_found = 0;
 	while (next_increment > 2) {
 		long long delta;
 		ybp_reset_event(evbuf);
@@ -327,7 +332,7 @@ static int ybpi_read_event(struct ybp_binlog_parser* restrict p, off_t offset, s
 static int ybpi_read_fde(struct ybp_binlog_parser* p)
 {
 	struct ybp_event* evbuf;
-	off64_t offset;
+	off_t offset;
 	bool esi = p->enforce_server_id;
 	int fd = p->fd;
 	time_t fde_time;
