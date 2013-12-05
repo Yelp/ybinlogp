@@ -46,5 +46,12 @@ AC_CHECK_FUNCS([memmove memset strdup strerror strndup])
 # python stuff
 AM_PATH_PYTHON
 
+# options
+AC_ARG_ENABLE(debug,
+              [ --enable-debug     build with tons of debugging],
+              [if test x$enableval = xyes ; then
+                    AC_DEFINE([DEBUG], 1, [debugging enabled])
+               fi])
+
 AC_CONFIG_FILES([Makefile include/Makefile libybinlogp/Makefile src/Makefile py/Makefile])
 AC_OUTPUT

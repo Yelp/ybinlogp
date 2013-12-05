@@ -1,6 +1,10 @@
 #ifndef DEBUGS_H
 #define DEBUGS_H
 
+#if HAVE_CONFIG_H
+    #include <config.h>
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
