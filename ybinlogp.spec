@@ -24,11 +24,7 @@ Library, program, and python bindings for parsing MySQL binlogs
 make
 
 %install
-install -D -m 444 src/ybinlogp.h $RPM_BUILD_ROOT/usr/include/ybinlogp.h
-install -D -m 755 build/ybinlogp $RPM_BUILD_ROOT/usr/sbin/ybinlogp
-install -D -m 555 build/libybinlogp.so.1 $RPM_BUILD_ROOT/usr/lib64/libybinlogp.so.1
-install -D -m 555 build/libybinlogp.so $RPM_BUILD_ROOT/usr/lib64/libybinlogp.so
-install -D -d src/ybinlogp $RPM_BUILD_ROOT/usr/lib64/python2.6/site-packages/ybinlogp
+make install
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -38,5 +34,6 @@ rm -rf $RPM_BUILD_ROOT
 /usr/sbin/ybinlogp
 /usr/lib64/libybinlogp.so.1
 /usr/lib64/libybinlogp.so
+/usr/lib64/libybinlogp.la
 /usr/lib64/python2.6/site-packages/ybinlogp
 %defattr(-,root,root)

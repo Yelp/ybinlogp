@@ -7,8 +7,9 @@
  * contents of that license can be found under license.txt
  */
 
-#define _XOPEN_SOURCE 600
-#define _GNU_SOURCE
+#if HAVE_CONFIG_H
+    #include <config.h>
+#endif
 
 #include <fcntl.h>
 #include <stdbool.h>
@@ -18,8 +19,8 @@
 #include <unistd.h>
 #include <time.h>
 
-#include "debugs.h"
-#include "ybinlogp.h"
+#include <ydebugs.h>
+#include <ybinlogp.h>
 
 void usage(void) {
 	fprintf(stderr, "ybinlogp_test [options] binlog\n");
@@ -90,7 +91,7 @@ int main(int argc, char** argv) {
 		usage();
 		return 2;
 	}
-	if ((fd = open(argv[optind], O_RDONLY|O_LARGEFILE)) <= 0) {
+	if ((fd = open(argv[optind], O_RDONLY)) <= 0) {
 		perror("Error opening file");
 		return 1;
 	}
@@ -105,7 +106,7 @@ int main(int argc, char** argv) {
 	}
 	ybp_init_event(evbuf);
 	if (starting_offset >= 0) {
-		off64_t offset = ybp_nearest_offset(bp, starting_offset);
+		off_t offset = ybp_nearest_offset(bp, starting_offset);
 		if (offset == -2) {
 			fprintf(stderr, "Unable to find anything after offset %ld\n", starting_offset);
 			return 1;
@@ -119,7 +120,7 @@ int main(int argc, char** argv) {
 		}
 	}
 	if (starting_time >= 0) {
-		off64_t offset = ybp_nearest_time(bp, starting_time);
+		off_t offset = ybp_nearest_time(bp, starting_time);
 		if (offset == -2) {
 			fprintf(stderr, "Unable to find anything after time %ld\n", starting_time);
 			return 1;
