@@ -1,1 +1,2 @@
-python_PYTHON = ybinlogp/__init__.py ybinlogp/parser.py
+ybinlogp_PYTHON = ybinlogp/__init__.py ybinlogp/parser.py
+ybinlogpdir = $(pythondir)/ybinlogp/

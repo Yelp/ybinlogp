@@ -32,3 +32,6 @@ missing
 stamp*
 *.tar.gz
 py-compile
+*.log
+*.trs
+test-driver

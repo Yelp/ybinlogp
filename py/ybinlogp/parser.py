@@ -12,11 +12,18 @@ import datetime
 import errno
 import logging
 import time
+import sys
 
 
 log = logging.getLogger('ybinlogp')
 
-library = ctypes.CDLL("libybinlogp.so.1", use_errno=True)
+if sys.platform == 'darwin':
+    ldname = 'libybinlogp.dylib'
+elif sys.platform == 'linux2':
+    ldname = 'libybinlogp.so'
+else:
+    raise ValueError('this module requires either darwin or linux2')
+library = ctypes.CDLL(ldname, use_errno=True)
 
 
 class EventStruct(ctypes.Structure):
