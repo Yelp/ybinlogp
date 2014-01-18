@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.69])
+AC_PREREQ([2.65])
 AC_INIT([ybinlogp], [0.6], [yelplabs@yelp.com])
 AC_USE_SYSTEM_EXTENSIONS
 AM_INIT_AUTOMAKE
@@ -28,7 +28,6 @@ AC_CHECK_LIB([ybinlogp], [main])
 AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
-AC_CHECK_HEADER_STDBOOL
 AC_TYPE_OFF_T
 AC_C_RESTRICT
 AC_TYPE_SIZE_T
