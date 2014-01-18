@@ -6,6 +6,20 @@ below which uses this library, and a python-ctypes wrapper that exposes some
 critical functionality (namely, opening a binlog, reading from it, and handling
 query, xid, and rotate events).
 
+Building
+--------
+This package is built with autotools. If you downloaded a tarball, it should be ready to go. 
+If you've cloned with git, you should be able to build with the standard sequence:
+
+    autoreconf -i
+    ./configure --prefix=/path/to/somewhere
+    make
+    sudo make install
+
+Maintaining
+-----------
+To release a new version, bump the version string in [NEWS.md](NEWS.md), [ybinlogp.spec](ybinlogp.spec) and [configure.ac](configure.ac), then run `make dist` to prepare a distribution tarball.
+
 Usage
 -----
 ybinlogp [options] binlog-file
@@ -43,4 +57,4 @@ It's Github... Fork away!
 License
 -------
 This work is available under the ISC (OpenBSD) license. The full contents are available
-as license.txt
+as COPYING
