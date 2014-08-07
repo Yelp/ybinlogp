@@ -14,8 +14,8 @@ class YBinlogPBuild(build):
         build.run(self)
 
 setup(
-    author='Daniel Nephin',
-    author_email='dnephin@yelp.com',
+    author='Yelp',
+    author_email='yelplabs@yelp.com',
     cmdclass={'build': YBinlogPBuild},
     data_files=[('lib', ['build/libybinlogp.so', 'build/libybinlogp.so.1']),
                 ('include', ['src/ybinlogp.h'])],
