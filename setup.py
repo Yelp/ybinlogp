@@ -7,11 +7,15 @@ from distutils.command.build import build
 class YBinlogPBuild(build):
     def initialize_options(self):
         build.initialize_options(self)
-        self.build_base = os.path.join(self.build_base, "python")
+        self.build_base = os.path.join(self.build_base, 'python')
 
     def run(self):
         subprocess.call(['make', 'build'])
         build.run(self)
+
+about = {}
+with open(os.path.join(os.path.dirname(__file__), 'src/ybinlogp/version.py')) as f:
+    exec f.read() in about
 
 setup(
     author='Yelp',
@@ -26,5 +30,5 @@ setup(
     packages=['ybinlogp'],
     scripts=['build/ybinlogp'],
     url='http://github.com/Yelp/ybinlogp',
-    version='0.6'
+    version=about['__version__']
 )
