@@ -1,0 +1,7 @@
+include build/Makefile
+include license.txt
+include Makefile
+include NEWS.md
+include README.md
+include src/*.c
+include src/*.h
