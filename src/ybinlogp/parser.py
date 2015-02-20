@@ -16,7 +16,13 @@ import time
 
 log = logging.getLogger('ybinlogp')
 
-library = ctypes.CDLL("libybinlogp.so.1", use_errno=True)
+try:
+	library = ctypes.CDLL("libybinlogp.so.1", use_errno=True)
+except OSError:
+	import os.path
+	from distutils.sysconfig import get_python_lib
+	path = os.path.join(get_python_lib(), '../../libybinlogp.so.1')
+	library = ctypes.CDLL(os.path.abspath(path), use_errno=True)
 
 
 class EventStruct(ctypes.Structure):
