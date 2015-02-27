@@ -4,6 +4,7 @@ TARGETS := libybinlogp.so.1 libybinlogp.so ybinlogp
 
 prefix := /usr
 
+CC := gcc
 CFLAGS += -Wall -ggdb -Wextra --std=c99 -pedantic
 LDFLAGS += -L.
 
@@ -14,7 +15,7 @@ debug: all
 all: $(TARGETS)
 
 ybinlogp: ybinlogp.o libybinlogp.so
-	gcc $(CFLAGS) $(LDFLAGS) -o $@ -lybinlogp $<
+	gcc $(CFLAGS) $(LDFLAGS) -o $@ $< -lybinlogp
 
 libybinlogp.so: libybinlogp.so.1
 	ln -fs $< $@
